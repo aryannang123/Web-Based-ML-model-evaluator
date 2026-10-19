@@ -1,8 +1,6 @@
+
 from database.db import db
 
-# TODO: US-02 - Design database schema
-# Assigned to: @aryannang123
-# Description: Define user table schema, fields (username, email, password_hash), and relationships.
 
 class User(db.Model):
     __tablename__ = "users"
@@ -12,4 +10,27 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
 
-    # TODO: Add relationships to Dataset and EvaluationResult
+    created_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        server_default=db.func.current_timestamp()
+    )
+
+    # Relationships
+    datasets = db.relationship(
+        "Dataset",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+    models = db.relationship(
+        "MLModel",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+    evaluations = db.relationship(
+        "EvaluationResult",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
