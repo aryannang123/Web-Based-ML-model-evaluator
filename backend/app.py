@@ -28,6 +28,7 @@ def create_app(config_class=Config):
     def index():
         return app.send_static_file("index.html")
 
+    # Health check endpoint ensuring project runs without structural errors
     @app.route("/api/health", methods=["GET"])
     def health_check():
         return jsonify({
