@@ -1,0 +1,43 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #212529;
+}
+
+.card {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.card-header {
+    border-bottom: 1px solid #edf2f7;
+}
+
+.table th {
+    font-weight: 600;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.table td {
+    white-space: nowrap;
+}
+
+.metric-card {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    border: 1px solid #e2e8f0;
+}
+
+.metric-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #0d6efd;
+}
+
+.confusion-matrix-table td {
+    padding: 8px 14px;
+    text-align: center;
+    font-weight: 600;
+}
