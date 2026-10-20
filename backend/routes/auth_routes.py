@@ -1,16 +1,73 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
+from werkzeug.security import generate_password_hash
+from sqlalchemy.exc import IntegrityError
+from database.db import db
+from models.user import User
+
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
-    # TODO: US-04: Implement user registration
-    # Assigned to: @nidhipoojamrutha20
-    # Steps:
-    # 1. Parse JSON body (username, email, password)
-    # 2. Validate input and check if user already exists
-    # 3. Hash password and save user record to database
-    return jsonify({"message": "Registration endpoint ready for US-04 implementation"}), 501
+    """Register a new user - GitHub Issue #4."""
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({"error": "Valid JSON is required"}), 400
+
+    username = data.get("username")
+    email = data.get("email")
+    password = data.get("password")
+
+    if not all(isinstance(x, str) for x in (username, email, password)):
+        return jsonify({"error": "All fields are required"}), 400
+
+    username = username.strip()
+    email = email.strip().lower()
+
+    if not username or not email or not password:
+        return jsonify({"error": "All fields are required"}), 400
+
+    if len(username) > 80:
+        return jsonify({"error": "Username is too long"}), 400
+
+    if (len(email) > 120 or " " in email
+            or email.count("@") != 1
+            or not email.split("@")[0]
+            or "." not in email.split("@")[1]
+            or not email.split("@")[1].strip(".")):
+        return jsonify({"error": "Invalid email address"}), 400
+
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+
+    if User.query.filter_by(email=email).first():
+        return jsonify({"error": "Email already registered"}), 409
+
+    if User.query.filter_by(username=username).first():
+        return jsonify({"error": "Username already exists"}), 409
+
+    user = User(
+        username=username,
+        email=email,
+        password_hash=generate_password_hash(password)
+    )
+
+    try:
+        db.session.add(user)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "Account already exists"}), 409
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "Registration failed"}), 500
+
+    return jsonify({
+        "message": "Registration successful",
+        "user_id": user.id
+    }), 201
+
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
