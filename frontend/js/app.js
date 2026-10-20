@@ -76,3 +76,42 @@ function setupEventListeners() {
 
     console.log("Frontend architecture initialized. Ready for US implementation.");
 }
+
+/* Issue #4: Registration form */
+document.getElementById("registration-form")
+  ?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const feedback = document.getElementById("registration-feedback");
+
+    const data = {
+      username: document.getElementById("reg-username").value.trim(),
+      email: document.getElementById("reg-email").value.trim(),
+      password: document.getElementById("reg-password").value
+    };
+
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+      });
+
+      const result = await response.json();
+
+      feedback.textContent = response.ok
+        ? result.message
+        : (result.error || "Registration failed");
+
+      feedback.className = response.ok
+        ? "mt-3 alert alert-success"
+        : "mt-3 alert alert-danger";
+
+      if (response.ok) event.target.reset();
+
+    } catch (error) {
+      feedback.textContent = "Unable to connect to server";
+      feedback.className = "mt-3 alert alert-danger";
+    }
+  });
+/* End Issue #4 */
