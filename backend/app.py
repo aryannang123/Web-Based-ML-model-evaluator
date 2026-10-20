@@ -1,6 +1,7 @@
 import os
 from flask import Flask, jsonify
 from flask_cors import CORS
+from werkzeug.exceptions import RequestEntityTooLarge
 from config import Config
 from database.db import init_db
 from routes import auth_bp, dataset_bp, ml_bp
@@ -36,6 +37,12 @@ def create_app(config_class=Config):
             "service": "Web-Based ML Model Evaluator Backend",
             "version": "1.0.0"
         }), 200
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_upload_too_large(_error):
+        return jsonify({
+            "error": f"The upload exceeds the {app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB file size limit."
+        }), 413
 
     return app
 

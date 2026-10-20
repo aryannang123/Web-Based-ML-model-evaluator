@@ -101,6 +101,34 @@ Opening **http://127.0.0.1:5000** in your browser will automatically serve the f
 | `/api/ml/train` | `POST` | Train model, evaluate metrics, and save model |
 | `/api/ml/evaluations/<user_id>` | `GET` | List evaluation history for user |
 
+### CSV dataset upload (Issue #8)
+
+`POST /api/dataset/upload` accepts a multipart form field named `file`. The endpoint requires a valid Flask session containing the authenticated user's `user_id`; it does not accept ownership from request data. It accepts readable UTF-8 CSV files up to the configured 16 MB request limit, requires unique non-empty headers and consistent row widths, stores files under `backend/uploads/` with server-generated names, and returns the dataset ID, original filename, row and column counts, and column names. Failed database writes are rolled back and the new file is removed.
+
+The login and logout endpoints are still placeholders in this repository. Uploads therefore return HTTP 401 until Issue #5 implements login and sets the verified user ID in the Flask session. This change does not alter registration, login, or logout behavior.
+
+#### macOS setup and tests
+
+Run these commands from the repository root to install the backend dependencies, run all backend tests, and start the app:
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests -p 'test_*.py' -v
+python app.py
+```
+
+To run only the isolated CSV upload tests after setup:
+
+```bash
+cd backend
+source .venv/bin/activate
+python -m unittest discover -s tests -p 'test_dataset_upload.py' -v
+```
+
 ---
 
 ## 🤖 Supported ML Algorithms
