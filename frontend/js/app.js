@@ -37,10 +37,10 @@ function setupEventListeners() {
 
 /* Issue #4: Registration form */
 document.getElementById("registration-form")
-  ?.addEventListener("submit", async (event) => {
-    event.preventDefault();
+  ?.addEventListener("submit", handleRegistrationSubmit);
 
-    const feedback = document.getElementById("registration-feedback");
+async function handleRegistrationSubmit(event) {
+    event.preventDefault();
 
     const data = {
       username: document.getElementById("reg-username").value.trim(),
@@ -48,28 +48,71 @@ document.getElementById("registration-form")
       password: document.getElementById("reg-password").value
     };
 
+    let response;
     try {
-      const response = await fetch("/api/auth/register", {
+      response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(data)
       });
-
-      const result = await response.json();
-
-      feedback.textContent = response.ok
-        ? result.message
-        : (result.error || "Registration failed");
-
-      feedback.className = response.ok
-        ? "mt-3 alert alert-success"
-        : "mt-3 alert alert-danger";
-
-      if (response.ok) event.target.reset();
-
-    } catch (error) {
-      feedback.textContent = "Unable to connect to server";
-      feedback.className = "mt-3 alert alert-danger";
+    } catch {
+      setRegistrationFeedback(
+        "Unable to reach the server. Check your connection and try again.",
+        false
+      );
+      return;
     }
-  });
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("json")) {
+      setRegistrationFeedback(
+        `The server returned a non-JSON response (HTTP ${response.status}).`,
+        false
+      );
+      return;
+    }
+
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      setRegistrationFeedback(
+        `The server returned invalid JSON (HTTP ${response.status}).`,
+        false
+      );
+      return;
+    }
+
+    if (!result || typeof result !== "object" || Array.isArray(result)) {
+      setRegistrationFeedback(
+        `The server returned an unexpected response (HTTP ${response.status}).`,
+        false
+      );
+      return;
+    }
+
+    if (!response.ok) {
+      const validationError = typeof result.error === "string"
+        ? result.error
+        : typeof result.message === "string"
+          ? result.message
+          : `Registration failed (HTTP ${response.status}).`;
+      setRegistrationFeedback(validationError, false);
+      return;
+    }
+
+    setRegistrationFeedback(
+      typeof result.message === "string" ? result.message : "Registration successful.",
+      true
+    );
+    event.currentTarget.reset();
+}
+
+function setRegistrationFeedback(message, success) {
+    const feedback = document.getElementById("registration-feedback");
+    feedback.textContent = message;
+    feedback.className = success
+      ? "mt-3 alert alert-success"
+      : "mt-3 alert alert-danger";
+}
 /* End Issue #4 */

@@ -63,6 +63,47 @@ class TestRegistration(unittest.TestCase):
         response = self.client.post("/api/auth/register", json=user)
         self.assertEqual(response.status_code, 409)
 
+    def test_username_maximum_length_is_accepted(self):
+        user = self.valid_user()
+        user["username"] = "u" * 80
+        response = self.client.post("/api/auth/register", json=user)
+        self.assertEqual(response.status_code, 201)
+
+    def test_username_over_maximum_length_is_rejected(self):
+        user = self.valid_user()
+        user["username"] = "u" * 81
+        response = self.client.post("/api/auth/register", json=user)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json["error"], "Username is too long")
+
+    def test_email_maximum_length_is_accepted(self):
+        user = self.valid_user()
+        user["email"] = f"{'a' * 115}@x.co"
+        self.assertEqual(len(user["email"]), 120)
+        response = self.client.post("/api/auth/register", json=user)
+        self.assertEqual(response.status_code, 201)
+
+    def test_email_over_maximum_length_is_rejected(self):
+        user = self.valid_user()
+        user["email"] = f"{'a' * 116}@x.co"
+        self.assertEqual(len(user["email"]), 121)
+        response = self.client.post("/api/auth/register", json=user)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json["error"], "Invalid email address")
+
+    def test_password_minimum_length_is_accepted(self):
+        user = self.valid_user()
+        user["password"] = "12345678"
+        response = self.client.post("/api/auth/register", json=user)
+        self.assertEqual(response.status_code, 201)
+
+    def test_password_below_minimum_length_is_rejected(self):
+        user = self.valid_user()
+        user["password"] = "1234567"
+        response = self.client.post("/api/auth/register", json=user)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json["error"], "Password must be at least 8 characters")
+
     def test_missing_fields(self):
         response = self.client.post(
             "/api/auth/register", json={"username": "test"}
