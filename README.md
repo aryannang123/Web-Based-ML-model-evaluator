@@ -167,8 +167,8 @@ Stores model performance metrics, confusion matrices, and classification reports
 To prevent data inconsistency where an evaluation's `user_id` doesn't match its model's owner, a **database-level CHECK constraint** has been implemented:
 
 ```sql
-ALTER TABLE evaluation_results 
-ADD CONSTRAINT evaluation_owner_matches_model_owner 
+ALTER TABLE evaluation_results
+ADD CONSTRAINT evaluation_owner_matches_model_owner
 CHECK (user_id = (SELECT user_id FROM models WHERE models.id = model_id));
 ```
 

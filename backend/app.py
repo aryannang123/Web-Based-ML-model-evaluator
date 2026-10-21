@@ -10,7 +10,11 @@ from routes import auth_bp, dataset_bp, ml_bp
 
 
 def create_app(config_class=Config):
-    app = Flask(__name__, static_folder="../frontend", static_url_path="")
+    app = Flask(
+        __name__,
+        static_folder="../frontend",
+        static_url_path="/static",
+    )
     app.config.from_object(config_class)
 
     # Restrict cross-origin requests to local development origins.
@@ -22,6 +26,8 @@ def create_app(config_class=Config):
                 "origins": [
                     "http://127.0.0.1:5000",
                     "http://localhost:5000",
+                    "http://127.0.0.1:5001",
+                    "http://localhost:5001",
                 ]
             }
         },
@@ -47,6 +53,13 @@ def create_app(config_class=Config):
 
     @app.before_request
     def protect_dashboard_file():
+        # Clean up legacy GET submissions that may have placed credentials in
+        # the login URL before the JavaScript form handler loaded.
+        if request.path == "/login" and {
+            "username", "email", "password"
+        }.intersection(request.args):
+            return redirect(url_for("login_page"))
+
         # Keep the dashboard HTML behind the login flow even when requested
         # through Flask's static-file route directly.
         if (
@@ -58,6 +71,12 @@ def create_app(config_class=Config):
 
     @app.route("/")
     def index():
+        if not has_authenticated_user():
+            return redirect(url_for("login_page"))
+        return app.send_static_file("index.html")
+
+    @app.route("/index.html")
+    def dashboard_file():
         if not has_authenticated_user():
             return redirect(url_for("login_page"))
         return app.send_static_file("index.html")

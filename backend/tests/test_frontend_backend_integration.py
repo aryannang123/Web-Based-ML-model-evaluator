@@ -53,10 +53,46 @@ class TestFrontendBackendIntegration(unittest.TestCase):
             response.close()
 
     def test_frontend_javascript_is_served(self):
-        response = self.client.get("/js/app.js")
+        response = self.client.get("/static/js/app.js")
         try:
             self.assertEqual(response.status_code, 200)
             self.assertIn(b"API_BASE", response.data)
+        finally:
+            response.close()
+
+    def test_frontend_stylesheet_is_served(self):
+        response = self.client.get("/static/css/style.css")
+        try:
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b"body", response.data)
+        finally:
+            response.close()
+
+    def test_login_page_references_static_assets(self):
+        response = self.client.get("/login")
+        try:
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b'href="/static/css/style.css"', response.data)
+            self.assertIn(b'src="/static/js/app.js"', response.data)
+            self.assertIn(
+                b'<form id="login-form" method="post" action="/api/auth/login">',
+                response.data,
+            )
+            self.assertIn(
+                b'<form id="registration-form" method="post" action="/api/auth/register">',
+                response.data,
+            )
+        finally:
+            response.close()
+
+    def test_login_query_credentials_are_redirected_to_a_clean_url(self):
+        response = self.client.get(
+            "/login?username=leaked&email=leaked@example.com&password=secret",
+            follow_redirects=False,
+        )
+        try:
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.headers["Location"], "/login")
         finally:
             response.close()
 
