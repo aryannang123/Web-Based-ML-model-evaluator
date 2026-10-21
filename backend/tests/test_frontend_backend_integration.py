@@ -23,8 +23,24 @@ class TestFrontendBackendIntegration(unittest.TestCase):
     def test_frontend_page_loads(self):
         response = self.client.get("/")
         try:
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.headers["Location"], "/login")
+        finally:
+            response.close()
+
+    def test_login_page_loads(self):
+        response = self.client.get("/login")
+        try:
             self.assertEqual(response.status_code, 200)
-            self.assertIn(b"html", response.data.lower())
+            self.assertIn(b"login-form", response.data)
+        finally:
+            response.close()
+
+    def test_dashboard_file_is_protected(self):
+        response = self.client.get("/index.html")
+        try:
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.headers["Location"], "/login")
         finally:
             response.close()
 

@@ -1,4 +1,3 @@
-
 /* Frontend REST Client for Web-Based ML Model Evaluator */
 
 // Use the same server that serves the frontend.
@@ -8,16 +7,19 @@ const API_BASE = "/api";
 document.addEventListener("DOMContentLoaded", () => {
     checkBackendHealth();
     setupEventListeners();
+    setupLoginForm();
+    setupRegistrationForm();
+    restoreSession();
 });
 
 // Reusable function for communicating with the backend API.
 async function apiRequest(endpoint, options = {}) {
     let response;
 
-    // Handle network errors, such as an unavailable backend.
     try {
         response = await fetch(`${API_BASE}${endpoint}`, {
             ...options,
+            credentials: "same-origin",
             headers: {
                 ...options.headers
             }
@@ -39,7 +41,6 @@ async function apiRequest(endpoint, options = {}) {
             throw new Error("The backend returned invalid JSON.");
         }
     } else {
-        // Handle HTML or other non-JSON responses.
         if (!response.ok) {
             throw new Error(
                 `The server returned an unexpected response (HTTP ${response.status}).`
@@ -49,7 +50,6 @@ async function apiRequest(endpoint, options = {}) {
         throw new Error("The backend returned a non-JSON response.");
     }
 
-    // Handle unsuccessful HTTP responses.
     if (!response.ok) {
         throw new Error(
             data.message ||
@@ -64,11 +64,7 @@ async function apiRequest(endpoint, options = {}) {
 // Check whether the backend server is available.
 async function checkBackendHealth() {
     const badge = document.getElementById("api-status");
-
-    if (!badge) {
-        console.error("API status element was not found");
-        return;
-    }
+    if (!badge) return;
 
     try {
         const data = await apiRequest("/health");
@@ -103,44 +99,89 @@ function setupEventListeners() {
     );
 }
 
-// Registration form.
-document.getElementById("registration-form")
-    ?.addEventListener("submit", async (event) => {
-        event.preventDefault();
+function setupLoginForm() {
+    document.getElementById("login-form")
+        ?.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const feedback = document.getElementById("login-feedback");
+            const submitButton = event.currentTarget.querySelector(
+                'button[type="submit"]'
+            );
+            const credentials = {
+                username: document.getElementById("login-username").value.trim(),
+                password: document.getElementById("login-password").value
+            };
 
-        const feedback = document.getElementById("registration-feedback");
+            submitButton.disabled = true;
+            feedback.textContent = "Signing in...";
+            feedback.className = "mt-3 text-muted";
 
-        const data = {
-            username: document.getElementById("reg-username").value.trim(),
-            email: document.getElementById("reg-email").value.trim(),
-            password: document.getElementById("reg-password").value
-        };
-
-        try {
-            const response = await apiRequest("/auth/register", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(data)
-            });
-
-            if (feedback) {
-                feedback.textContent =
-                    response.message || "Registration successful";
-
-                feedback.className = "mt-3 alert alert-success";
-            }
-
-            event.target.reset();
-        } catch (error) {
-            if (feedback) {
-                feedback.textContent =
-                    error.message || "Registration failed";
-
+            try {
+                const result = await apiRequest("/auth/login", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(credentials)
+                });
+                window.location.assign(result.redirect_url || "/");
+            } catch (error) {
+                feedback.textContent = error.message;
                 feedback.className = "mt-3 alert alert-danger";
+            } finally {
+                submitButton.disabled = false;
             }
+        });
+}
 
-            console.error("Registration failed:", error.message);
+async function restoreSession() {
+    const currentUser = document.getElementById("current-user");
+    if (!currentUser) return;
+
+    try {
+        const result = await apiRequest("/auth/session");
+        if (!result.authenticated) {
+            window.location.replace("/login");
+            return;
         }
-    });
+        currentUser.textContent = result.user.username;
+    } catch {
+        window.location.replace("/login");
+    }
+}
+
+// Registration form (US-04).
+function setupRegistrationForm() {
+    document.getElementById("registration-form")
+        ?.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const feedback = document.getElementById("registration-feedback");
+            const data = {
+                username: document.getElementById("reg-username").value.trim(),
+                email: document.getElementById("reg-email").value.trim(),
+                password: document.getElementById("reg-password").value
+            };
+
+            try {
+                const response = await apiRequest("/auth/register", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(data)
+                });
+
+                if (feedback) {
+                    feedback.textContent =
+                        response.message || "Registration successful";
+                    feedback.className = "mt-3 alert alert-success";
+                }
+
+                event.target.reset();
+            } catch (error) {
+                if (feedback) {
+                    feedback.textContent = error.message || "Registration failed";
+                    feedback.className = "mt-3 alert alert-danger";
+                }
+
+                console.error("Registration failed:", error.message);
+            }
+        });
+}

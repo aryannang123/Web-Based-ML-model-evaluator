@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 from uuid import uuid4
 
 from app import create_app
@@ -11,13 +13,19 @@ class TestRegistration(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls.storage = tempfile.TemporaryDirectory(
+            prefix="ml-evaluator-registration-",
+            dir=Path(__file__).resolve().parent,
+        )
+        storage_path = Path(cls.storage.name)
+
         class TestConfig:
             TESTING = True
             SECRET_KEY = "test-only"
             SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
             SQLALCHEMY_TRACK_MODIFICATIONS = False
-            UPLOAD_FOLDER = "/tmp/ml-evaluator-tests-uploads"
-            SAVED_MODELS_FOLDER = "/tmp/ml-evaluator-tests-models"
+            UPLOAD_FOLDER = str(storage_path / "uploads")
+            SAVED_MODELS_FOLDER = str(storage_path / "models")
 
         cls.app = create_app(TestConfig)
         cls.context = cls.app.app_context()
@@ -28,6 +36,7 @@ class TestRegistration(unittest.TestCase):
         db.session.remove()
         db.drop_all()
         cls.context.pop()
+        cls.storage.cleanup()
 
     def setUp(self):
         self.client = self.app.test_client()

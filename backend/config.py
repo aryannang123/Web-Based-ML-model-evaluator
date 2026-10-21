@@ -1,9 +1,17 @@
 import os
+import secrets
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-ml-evaluator-2026")
+    # Use a fresh development key when one is not configured. Deployments should
+    # provide a stable SECRET_KEY through the environment.
+    SECRET_KEY = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = os.environ.get(
+        "SESSION_COOKIE_SECURE", "false"
+    ).lower() == "true"
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         "DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'ml_evaluator.db')}"
     )
