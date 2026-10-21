@@ -1,118 +1,198 @@
-// Frontend REST Client for Web-Based ML Model Evaluator
-// Architecture Scaffolding for US-01
+/* Frontend REST Client for Web-Based ML Model Evaluator */
 
-const API_BASE = "http://127.0.0.1:5000/api";
+// Use the same server that serves the frontend.
+const API_BASE = "/api";
 
-document.addEventListener("DOMContentLoaded", () => {
+// Initialize frontend when the page loads.
+document.addEventListener("DOMContentLoaded", initializeFrontend);
+
+function initializeFrontend() {
     checkBackendHealth();
     setupEventListeners();
-});
+    setupLoginForm();
+    setupRegistrationForm();
+    restoreSession();
+}
 
-// Health check to verify communication with Flask server
+// Reusable function for communicating with the backend API.
+async function apiRequest(endpoint, options = {}) {
+    let response;
+
+    try {
+        response = await fetch(`${API_BASE}${endpoint}`, {
+            ...options,
+            credentials: "same-origin",
+            headers: {
+                ...options.headers
+            }
+        });
+    } catch {
+        throw new Error(
+            "Unable to reach the server. Check your connection and try again."
+        );
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("json")) {
+        throw new Error(
+            `The server returned a non-JSON response (HTTP ${response.status}).`
+        );
+    }
+
+    let data;
+    try {
+        data = await response.json();
+    } catch {
+        throw new Error(
+            `The server returned invalid JSON (HTTP ${response.status}).`
+        );
+    }
+
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error(
+            `The server returned an unexpected response (HTTP ${response.status}).`
+        );
+    }
+
+    if (!response.ok) {
+        throw new Error(
+            (typeof data.error === "string" && data.error) ||
+            (typeof data.message === "string" && data.message) ||
+            `API request failed with status ${response.status}`
+        );
+    }
+
+    return data;
+}
+
+// Check whether the backend server is available.
 async function checkBackendHealth() {
     const badge = document.getElementById("api-status");
+    if (!badge) return;
+
     try {
-        const res = await fetch(`${API_BASE}/health`);
-        if (res.ok) {
+        const data = await apiRequest("/health");
+
+        if (data.status === "healthy") {
             badge.className = "badge bg-success me-3";
-            badge.innerHTML = '<i class="bi bi-circle-fill me-1 small"></i>API Connected';
+            badge.innerHTML =
+                '<i class="bi bi-circle-fill me-1 small"></i>API Connected';
         } else {
-            throw new Error();
+            throw new Error("Backend is not healthy");
         }
-    } catch {
+    } catch (error) {
         badge.className = "badge bg-warning text-dark me-3";
-        badge.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1 small"></i>API Offline';
+        badge.innerHTML =
+            '<i class="bi bi-exclamation-triangle-fill me-1 small"></i>API Offline';
+
+        console.error("Backend connection failed:", error.message);
     }
 }
 
+// Set up frontend event listeners.
 function setupEventListeners() {
-    // TODO: US-03 - Set up frontend-backend communication (Assigned to: @abhishekdeene-eng)
-    // TODO: US-08 - Connect file upload form (Assigned to: @nidhipoojamrutha20)
-    // TODO: US-15 - Target column dropdown listener (Assigned to: @abhishekdeene-eng)
-    // TODO: US-16 - Split ratio range slider listener (Assigned to: @nidhipoojamrutha20)
-    // TODO: US-18 - Train button listener and loading indicator (Assigned to: @aryannang123)
-    // TODO: US-19 - Render evaluation metrics and confusion matrix (Assigned to: @abhishekdeene-eng)
-    console.log("Frontend architecture initialized. Ready for US implementation.");
+    // US-03: Frontend-backend communication.
+    // TODO: US-08 - Connect file upload form (Nidhi).
+    // TODO: US-15 - Target column dropdown listener (Abhishek).
+    // TODO: US-16 - Split ratio range slider listener (Nidhi).
+    // TODO: US-18 - Train button listener (Aryan).
+    // TODO: US-19 - Render evaluation metrics and confusion matrix (Abhishek).
+
+    console.log(
+        "Frontend architecture initialized. Ready for US implementation."
+    );
 }
 
-/* Issue #4: Registration form */
-document.getElementById("registration-form")
-  ?.addEventListener("submit", handleRegistrationSubmit);
+function setupLoginForm() {
+    document.getElementById("login-form")
+        ?.addEventListener("submit", handleLoginSubmit);
+}
+
+async function handleLoginSubmit(event) {
+    event.preventDefault();
+    const feedback = document.getElementById("login-feedback");
+    const submitButton = event.currentTarget.querySelector(
+        'button[type="submit"]'
+    );
+    const credentials = {
+        username: document.getElementById("login-username").value.trim(),
+        password: document.getElementById("login-password").value
+    };
+
+    submitButton.disabled = true;
+    feedback.textContent = "Signing in...";
+    feedback.className = "mt-3 text-muted";
+
+    try {
+        const result = await apiRequest("/auth/login", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(credentials)
+        });
+        window.location.assign(result.redirect_url || "/");
+    } catch (error) {
+        feedback.textContent = error.message;
+        feedback.className = "mt-3 alert alert-danger";
+    } finally {
+        submitButton.disabled = false;
+    }
+}
+
+async function restoreSession() {
+    const currentUser = document.getElementById("current-user");
+    if (!currentUser) return;
+
+    try {
+        const result = await apiRequest("/auth/session");
+        if (!result.authenticated) {
+            window.location.replace("/login");
+            return;
+        }
+        currentUser.textContent = result.user.username;
+    } catch {
+        window.location.replace("/login");
+    }
+}
+
+// Registration form (US-04).
+function setupRegistrationForm() {
+    document.getElementById("registration-form")
+        ?.addEventListener("submit", handleRegistrationSubmit);
+}
 
 async function handleRegistrationSubmit(event) {
     event.preventDefault();
 
     const data = {
-      username: document.getElementById("reg-username").value.trim(),
-      email: document.getElementById("reg-email").value.trim(),
-      password: document.getElementById("reg-password").value
+        username: document.getElementById("reg-username").value.trim(),
+        email: document.getElementById("reg-email").value.trim(),
+        password: document.getElementById("reg-password").value
     };
 
-    let response;
     try {
-      response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(data)
-      });
-    } catch {
-      setRegistrationFeedback(
-        "Unable to reach the server. Check your connection and try again.",
-        false
-      );
-      return;
-    }
+        const result = await apiRequest("/auth/register", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(data)
+        });
 
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.toLowerCase().includes("json")) {
-      setRegistrationFeedback(
-        `The server returned a non-JSON response (HTTP ${response.status}).`,
-        false
-      );
-      return;
+        setRegistrationFeedback(
+            result.message || "Registration successful.",
+            true
+        );
+        event.currentTarget.reset();
+    } catch (error) {
+        setRegistrationFeedback(error.message || "Registration failed.", false);
+        console.error("Registration failed:", error.message);
     }
-
-    let result;
-    try {
-      result = await response.json();
-    } catch {
-      setRegistrationFeedback(
-        `The server returned invalid JSON (HTTP ${response.status}).`,
-        false
-      );
-      return;
-    }
-
-    if (!result || typeof result !== "object" || Array.isArray(result)) {
-      setRegistrationFeedback(
-        `The server returned an unexpected response (HTTP ${response.status}).`,
-        false
-      );
-      return;
-    }
-
-    if (!response.ok) {
-      const validationError = typeof result.error === "string"
-        ? result.error
-        : typeof result.message === "string"
-          ? result.message
-          : `Registration failed (HTTP ${response.status}).`;
-      setRegistrationFeedback(validationError, false);
-      return;
-    }
-
-    setRegistrationFeedback(
-      typeof result.message === "string" ? result.message : "Registration successful.",
-      true
-    );
-    event.currentTarget.reset();
 }
 
 function setRegistrationFeedback(message, success) {
     const feedback = document.getElementById("registration-feedback");
+    if (!feedback) return;
+
     feedback.textContent = message;
     feedback.className = success
-      ? "mt-3 alert alert-success"
-      : "mt-3 alert alert-danger";
+        ? "mt-3 alert alert-success"
+        : "mt-3 alert alert-danger";
 }
-/* End Issue #4 */
