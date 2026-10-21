@@ -19,7 +19,7 @@
                 <div class="card shadow-sm h-100">
                     <div class="card-body p-4">
                         <h2 class="h4" id="login-heading">Sign in</h2>
-                        <form id="login-form">
+                        <form id="login-form" method="post" action="/api/auth/login">
                             <div class="mb-3">
                                 <label class="form-label" for="login-username">Username</label>
                                 <input class="form-control" id="login-username"
@@ -47,7 +47,7 @@
                     <div class="card-body p-4">
                         <h2 class="h4" id="register-heading">Create account</h2>
                         <p class="text-muted">New to the evaluator? Register here.</p>
-                        <form id="registration-form">
+                        <form id="registration-form" method="post" action="/api/auth/register">
                             <div class="mb-3">
                                 <label class="form-label" for="reg-username">Username</label>
                                 <input class="form-control" id="reg-username"
