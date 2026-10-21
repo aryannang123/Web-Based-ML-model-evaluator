@@ -1,24 +1,34 @@
 
-// Frontend REST Client for Web-Based ML Model Evaluator
+/* Frontend REST Client for Web-Based ML Model Evaluator */
 
-const API_BASE = "http://127.0.0.1:5000/api";
+// Use the same server that serves the frontend.
+const API_BASE = "/api";
 
-// Initialize frontend when the page loads
+// Initialize frontend when the page loads.
 document.addEventListener("DOMContentLoaded", () => {
     checkBackendHealth();
     setupEventListeners();
 });
 
-// Reusable function for communicating with the backend API
+// Reusable function for communicating with the backend API.
 async function apiRequest(endpoint, options = {}) {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-        ...options,
-        headers: {
-            ...options.headers
-        }
-    });
+    let response;
 
-    // Read the response according to its content type
+    // Handle network errors, such as an unavailable backend.
+    try {
+        response = await fetch(`${API_BASE}${endpoint}`, {
+            ...options,
+            headers: {
+                ...options.headers
+            }
+        });
+    } catch {
+        throw new Error(
+            "Unable to connect to the server. Please check your connection."
+        );
+    }
+
+    // Read the response according to its content type.
     const contentType = response.headers.get("content-type") || "";
     let data = {};
 
@@ -26,11 +36,20 @@ async function apiRequest(endpoint, options = {}) {
         try {
             data = await response.json();
         } catch {
-            throw new Error("The backend returned invalid JSON");
+            throw new Error("The backend returned invalid JSON.");
         }
+    } else {
+        // Handle HTML or other non-JSON responses.
+        if (!response.ok) {
+            throw new Error(
+                `The server returned an unexpected response (HTTP ${response.status}).`
+            );
+        }
+
+        throw new Error("The backend returned a non-JSON response.");
     }
 
-    // Handle unsuccessful HTTP responses
+    // Handle unsuccessful HTTP responses.
     if (!response.ok) {
         throw new Error(
             data.message ||
@@ -42,9 +61,14 @@ async function apiRequest(endpoint, options = {}) {
     return data;
 }
 
-// Check whether the backend server is available
+// Check whether the backend server is available.
 async function checkBackendHealth() {
     const badge = document.getElementById("api-status");
+
+    if (!badge) {
+        console.error("API status element was not found");
+        return;
+    }
 
     try {
         const data = await apiRequest("/health");
@@ -65,53 +89,58 @@ async function checkBackendHealth() {
     }
 }
 
-// Set up frontend event listeners
+// Set up frontend event listeners.
 function setupEventListeners() {
-    // US-03: Frontend-backend communication implemented
-    // TODO: US-08 - Connect file upload form (Nidhi)
-    // TODO: US-15 - Target column dropdown listener (Abhishek)
-    // TODO: US-16 - Split ratio range slider listener (Nidhi)
-    // TODO: US-18 - Train button listener (Aryan)
-    // TODO: US-19 - Render evaluation metrics and confusion matrix (Abhishek)
+    // US-03: Frontend-backend communication.
+    // TODO: US-08 - Connect file upload form (Nidhi).
+    // TODO: US-15 - Target column dropdown listener (Abhishek).
+    // TODO: US-16 - Split ratio range slider listener (Nidhi).
+    // TODO: US-18 - Train button listener (Aryan).
+    // TODO: US-19 - Render evaluation metrics and confusion matrix (Abhishek).
 
-    console.log("Frontend architecture initialized. Ready for US implementation.");
+    console.log(
+        "Frontend architecture initialized. Ready for US implementation."
+    );
 }
 
-/* Issue #4: Registration form */
+// Registration form.
 document.getElementById("registration-form")
-  ?.addEventListener("submit", async (event) => {
-    event.preventDefault();
+    ?.addEventListener("submit", async (event) => {
+        event.preventDefault();
 
-    const feedback = document.getElementById("registration-feedback");
+        const feedback = document.getElementById("registration-feedback");
 
-    const data = {
-      username: document.getElementById("reg-username").value.trim(),
-      email: document.getElementById("reg-email").value.trim(),
-      password: document.getElementById("reg-password").value
-    };
+        const data = {
+            username: document.getElementById("reg-username").value.trim(),
+            email: document.getElementById("reg-email").value.trim(),
+            password: document.getElementById("reg-password").value
+        };
 
-    try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(data)
-      });
+        try {
+            const response = await apiRequest("/auth/register", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(data)
+            });
 
-      const result = await response.json();
+            if (feedback) {
+                feedback.textContent =
+                    response.message || "Registration successful";
 
-      feedback.textContent = response.ok
-        ? result.message
-        : (result.error || "Registration failed");
+                feedback.className = "mt-3 alert alert-success";
+            }
 
-      feedback.className = response.ok
-        ? "mt-3 alert alert-success"
-        : "mt-3 alert alert-danger";
+            event.target.reset();
+        } catch (error) {
+            if (feedback) {
+                feedback.textContent =
+                    error.message || "Registration failed";
 
-      if (response.ok) event.target.reset();
+                feedback.className = "mt-3 alert alert-danger";
+            }
 
-    } catch (error) {
-      feedback.textContent = "Unable to connect to server";
-      feedback.className = "mt-3 alert alert-danger";
-    }
-  });
-/* End Issue #4 */
+            console.error("Registration failed:", error.message);
+        }
+    });
