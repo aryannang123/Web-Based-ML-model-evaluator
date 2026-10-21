@@ -1,8 +1,10 @@
 from flask import Blueprint, jsonify
+from routes.auth_utils import login_required
 
 dataset_bp = Blueprint("dataset", __name__, url_prefix="/api/dataset")
 
 @dataset_bp.route("/upload", methods=["POST"])
+@login_required
 def upload_dataset():
     # TODO: US-08: Implement CSV dataset upload
     # Assigned to: @nidhipoojamrutha20
@@ -13,6 +15,7 @@ def upload_dataset():
     return jsonify({"message": "Dataset upload endpoint ready for US-08 implementation"}), 501
 
 @dataset_bp.route("/<int:dataset_id>/preview", methods=["GET"])
+@login_required
 def preview_dataset(dataset_id):
     # TODO: US-12: Display dataset preview
     # Assigned to: @nidhipoojamrutha20
@@ -20,6 +23,7 @@ def preview_dataset(dataset_id):
     return jsonify({"message": "Dataset preview endpoint ready for US-12 implementation"}), 501
 
 @dataset_bp.route("/<int:dataset_id>/statistics", methods=["GET"])
+@login_required
 def dataset_statistics(dataset_id):
     # TODO: US-13: Display dataset Statistics
     # Assigned to: @gaganraghavan

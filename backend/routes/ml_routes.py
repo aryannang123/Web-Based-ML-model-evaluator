@@ -1,8 +1,10 @@
 from flask import Blueprint, jsonify
+from routes.auth_utils import login_required
 
 ml_bp = Blueprint("ml", __name__, url_prefix="/api/ml")
 
 @ml_bp.route("/algorithms", methods=["GET"])
+@login_required
 def get_algorithms():
     # TODO: US-17: Implement ML algorithm selection
     # Assigned to: @gaganraghavan
@@ -13,6 +15,7 @@ def get_algorithms():
     }), 200
 
 @ml_bp.route("/train", methods=["POST"])
+@login_required
 def train_model():
     # TODO: US-18: Implement model training
     # Assigned to: @aryannang123
@@ -23,6 +26,7 @@ def train_model():
     return jsonify({"message": "Model training endpoint ready for US-18 implementation"}), 501
 
 @ml_bp.route("/evaluate", methods=["POST"])
+@login_required
 def evaluate_model():
     # TODO: US-19: Implement model evaluation and visualization
     # Assigned to: @abhishekdeene-eng

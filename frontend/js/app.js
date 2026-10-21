@@ -1,9 +1,9 @@
+
 /* Frontend REST Client for Web-Based ML Model Evaluator */
 
-// Use the same server that serves the frontend.
 const API_BASE = "/api";
 
-// Initialize frontend when the page loads.
+// Initialize once when the DOM is ready.
 document.addEventListener("DOMContentLoaded", initializeFrontend);
 
 function initializeFrontend() {
@@ -14,7 +14,7 @@ function initializeFrontend() {
     restoreSession();
 }
 
-// Reusable function for communicating with the backend API.
+// Shared API helper for all frontend requests.
 async function apiRequest(endpoint, options = {}) {
     let response;
 
@@ -32,7 +32,9 @@ async function apiRequest(endpoint, options = {}) {
         );
     }
 
-    const contentType = response.headers.get("content-type") || "";
+    const contentType =
+        response.headers.get("content-type") || "";
+
     if (!contentType.toLowerCase().includes("json")) {
         throw new Error(
             `The server returned a non-JSON response (HTTP ${response.status}).`
@@ -40,6 +42,7 @@ async function apiRequest(endpoint, options = {}) {
     }
 
     let data;
+
     try {
         data = await response.json();
     } catch {
@@ -56,8 +59,8 @@ async function apiRequest(endpoint, options = {}) {
 
     if (!response.ok) {
         throw new Error(
-            (typeof data.error === "string" && data.error) ||
-            (typeof data.message === "string" && data.message) ||
+            data.message ||
+            data.error ||
             `API request failed with status ${response.status}`
         );
     }
@@ -65,134 +68,196 @@ async function apiRequest(endpoint, options = {}) {
     return data;
 }
 
-// Check whether the backend server is available.
+// Verify backend connectivity.
 async function checkBackendHealth() {
     const badge = document.getElementById("api-status");
+
     if (!badge) return;
 
     try {
         const data = await apiRequest("/health");
 
-        if (data.status === "healthy") {
-            badge.className = "badge bg-success me-3";
-            badge.innerHTML =
-                '<i class="bi bi-circle-fill me-1 small"></i>API Connected';
-        } else {
+        if (data.status !== "healthy") {
             throw new Error("Backend is not healthy");
         }
+
+        badge.className = "badge bg-success me-3";
+        badge.innerHTML =
+            '<i class="bi bi-circle-fill me-1 small"></i>API Connected';
+
     } catch (error) {
-        badge.className = "badge bg-warning text-dark me-3";
+        badge.className =
+            "badge bg-warning text-dark me-3";
+
         badge.innerHTML =
             '<i class="bi bi-exclamation-triangle-fill me-1 small"></i>API Offline';
 
-        console.error("Backend connection failed:", error.message);
+        console.error(
+            "Backend connection failed:",
+            error.message
+        );
     }
 }
 
-// Set up frontend event listeners.
+// Existing frontend architecture.
 function setupEventListeners() {
     // US-03: Frontend-backend communication.
-    // TODO: US-08 - Connect file upload form (Nidhi).
-    // TODO: US-15 - Target column dropdown listener (Abhishek).
-    // TODO: US-16 - Split ratio range slider listener (Nidhi).
-    // TODO: US-18 - Train button listener (Aryan).
-    // TODO: US-19 - Render evaluation metrics and confusion matrix (Abhishek).
+    // US-08: CSV upload integration.
+    // US-15: Target column selection.
+    // US-16: Train-test split configuration.
+    // US-18: Model training integration.
+    // US-19: Evaluation result rendering.
 
     console.log(
         "Frontend architecture initialized. Ready for US implementation."
     );
 }
 
+// Existing login functionality.
 function setupLoginForm() {
-    document.getElementById("login-form")
-        ?.addEventListener("submit", handleLoginSubmit);
+    const form = document.getElementById("login-form");
+
+    if (!form) return;
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const feedback =
+            document.getElementById("login-feedback");
+
+        const submitButton =
+            form.querySelector('button[type="submit"]');
+
+        const credentials = {
+            username:
+                document.getElementById("login-username").value.trim(),
+            password:
+                document.getElementById("login-password").value
+        };
+
+        if (submitButton) submitButton.disabled = true;
+
+        if (feedback) {
+            feedback.textContent = "Signing in...";
+            feedback.className = "mt-3 text-muted";
+        }
+
+        try {
+            const result = await apiRequest("/auth/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(credentials)
+            });
+
+            window.location.assign(
+                result.redirect_url || "/"
+            );
+
+        } catch (error) {
+            if (feedback) {
+                feedback.textContent = error.message;
+                feedback.className =
+                    "mt-3 alert alert-danger";
+            }
+
+        } finally {
+            if (submitButton) submitButton.disabled = false;
+        }
+    });
 }
 
-async function handleLoginSubmit(event) {
-    event.preventDefault();
-    const feedback = document.getElementById("login-feedback");
-    const submitButton = event.currentTarget.querySelector(
-        'button[type="submit"]'
-    );
-    const credentials = {
-        username: document.getElementById("login-username").value.trim(),
-        password: document.getElementById("login-password").value
-    };
-
-    submitButton.disabled = true;
-    feedback.textContent = "Signing in...";
-    feedback.className = "mt-3 text-muted";
-
-    try {
-        const result = await apiRequest("/auth/login", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(credentials)
-        });
-        window.location.assign(result.redirect_url || "/");
-    } catch (error) {
-        feedback.textContent = error.message;
-        feedback.className = "mt-3 alert alert-danger";
-    } finally {
-        submitButton.disabled = false;
-    }
-}
-
+// Restore authenticated user session.
 async function restoreSession() {
-    const currentUser = document.getElementById("current-user");
+    const currentUser =
+        document.getElementById("current-user");
+
     if (!currentUser) return;
 
     try {
         const result = await apiRequest("/auth/session");
+
         if (!result.authenticated) {
             window.location.replace("/login");
             return;
         }
-        currentUser.textContent = result.user.username;
+
+        currentUser.textContent =
+            result.user.username;
+
     } catch {
         window.location.replace("/login");
     }
 }
 
-// Registration form (US-04).
+// US-04: User Registration.
 function setupRegistrationForm() {
-    document.getElementById("registration-form")
-        ?.addEventListener("submit", handleRegistrationSubmit);
-}
+    const form =
+        document.getElementById("registration-form");
 
-async function handleRegistrationSubmit(event) {
-    event.preventDefault();
+    if (!form) return;
 
-    const data = {
-        username: document.getElementById("reg-username").value.trim(),
-        email: document.getElementById("reg-email").value.trim(),
-        password: document.getElementById("reg-password").value
-    };
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
 
-    try {
-        const result = await apiRequest("/auth/register", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(data)
-        });
+        const feedback =
+            document.getElementById("registration-feedback");
 
-        setRegistrationFeedback(
-            result.message || "Registration successful.",
-            true
-        );
-        event.currentTarget.reset();
-    } catch (error) {
-        setRegistrationFeedback(error.message || "Registration failed.", false);
-        console.error("Registration failed:", error.message);
-    }
-}
+        const submitButton =
+            form.querySelector('button[type="submit"]');
 
-function setRegistrationFeedback(message, success) {
-    const feedback = document.getElementById("registration-feedback");
-    if (!feedback) return;
+        const registrationData = {
+            username:
+                document.getElementById("reg-username").value.trim(),
+            email:
+                document.getElementById("reg-email").value.trim(),
+            password:
+                document.getElementById("reg-password").value
+        };
 
-    feedback.textContent = message;
-    feedback.className = success
-        ? "mt-3 alert alert-success"
-        : "mt-3 alert alert-danger";
+        if (submitButton) submitButton.disabled = true;
+
+        if (feedback) {
+            feedback.textContent = "Creating account...";
+            feedback.className = "mt-3 text-muted";
+        }
+
+        try {
+            const result = await apiRequest("/auth/register", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(registrationData)
+            });
+
+            if (feedback) {
+                feedback.textContent =
+                    result.message || "Registration successful.";
+
+                feedback.className =
+                    "mt-3 alert alert-success";
+            }
+
+            form.reset();
+
+        } catch (error) {
+            if (feedback) {
+                feedback.textContent =
+                    error.message || "Registration failed.";
+
+                feedback.className =
+                    "mt-3 alert alert-danger";
+            }
+
+            console.error(
+                "Registration failed:",
+                error.message
+            );
+
+        } finally {
+            if (submitButton) submitButton.disabled = false;
+        }
+    });
 }
