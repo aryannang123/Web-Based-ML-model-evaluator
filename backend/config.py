@@ -12,6 +12,9 @@ class Config:
     SESSION_COOKIE_SECURE = os.environ.get(
         "SESSION_COOKIE_SECURE", "false"
     ).lower() == "true"
+    HOST = os.environ.get("HOST", "127.0.0.1")
+    PORT = int(os.environ.get("PORT", "5000"))
+    DEBUG = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         "DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'ml_evaluator.db')}"
     )

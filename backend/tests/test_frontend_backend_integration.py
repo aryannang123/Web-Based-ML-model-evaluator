@@ -1,6 +1,7 @@
 import unittest
 
 from app import create_app
+from database.db import db
 
 
 class TestFrontendBackendIntegration(unittest.TestCase):
@@ -16,6 +17,15 @@ class TestFrontendBackendIntegration(unittest.TestCase):
             SAVED_MODELS_FOLDER = "test_saved_models"
 
         cls.app = create_app(TestConfig)
+        cls.context = cls.app.app_context()
+        cls.context.push()
+
+    @classmethod
+    def tearDownClass(cls):
+        db.session.remove()
+        db.drop_all()
+        db.engine.dispose()
+        cls.context.pop()
 
     def setUp(self):
         self.client = self.app.test_client()

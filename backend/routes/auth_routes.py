@@ -38,8 +38,8 @@ def register():
             or not email.split("@")[1].strip(".")):
         return jsonify({"error": "Invalid email address"}), 400
 
-    if len(password) < 8:
-        return jsonify({"error": "Password must be at least 8 characters"}), 400
+    if not 8 <= len(password) <= 128:
+        return jsonify({"error": "Password must be 8 to 128 characters"}), 400
 
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "Email already registered"}), 409
@@ -83,6 +83,8 @@ def login():
     username = username.strip()
     if not username or not password:
         return jsonify({"error": "Username and password are required"}), 400
+    if len(username) > 80 or len(password) > 128:
+        return jsonify({"error": "Invalid username or password"}), 401
 
     user = User.query.filter_by(username=username).first()
     if user is None or not check_password_hash(user.password_hash, password):

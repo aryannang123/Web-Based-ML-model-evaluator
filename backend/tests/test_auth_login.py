@@ -37,6 +37,7 @@ class TestLogin(unittest.TestCase):
     def tearDownClass(cls):
         db.session.remove()
         db.drop_all()
+        db.engine.dispose()
         cls.context.pop()
         cls.storage.cleanup()
 
@@ -150,11 +151,15 @@ class TestLogin(unittest.TestCase):
         dashboard = self.client.get("/")
         direct_dashboard_file = self.client.get("/index.html")
         algorithms = self.client.get("/api/ml/algorithms")
-
-        self.assertEqual(dashboard.status_code, 200)
-        self.assertEqual(direct_dashboard_file.status_code, 200)
-        self.assertEqual(algorithms.status_code, 200)
-        self.assertIn("classification", algorithms.json)
+        try:
+            self.assertEqual(dashboard.status_code, 200)
+            self.assertEqual(direct_dashboard_file.status_code, 200)
+            self.assertEqual(algorithms.status_code, 200)
+            self.assertIn("classification", algorithms.json)
+        finally:
+            dashboard.close()
+            direct_dashboard_file.close()
+            algorithms.close()
 
     def test_login_clears_prior_session_data_and_sets_cookie_flags(self):
         with self.client.session_transaction() as session_data:
