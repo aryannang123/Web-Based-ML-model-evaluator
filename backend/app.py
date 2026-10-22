@@ -2,6 +2,7 @@ import os
 
 from flask import Flask, jsonify, redirect, request, session, url_for
 from flask_cors import CORS
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from config import Config
 from database.db import db, init_db
@@ -77,6 +78,15 @@ def create_app(config_class=Config):
                 "version": "1.0.0",
             }
         ), 200
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_upload_too_large(_error):
+        limit = app.config.get("MAX_CONTENT_LENGTH")
+        if limit:
+            message = f"The upload exceeds the {limit // (1024 * 1024)} MB file size limit."
+        else:
+            message = "The uploaded file exceeds the allowed size limit."
+        return jsonify({"error": message}), 413
 
     return app
 
