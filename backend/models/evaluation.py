@@ -1,6 +1,6 @@
 
 from database.db import db
-from sqlalchemy import CheckConstraint
+from sqlalchemy import DDL, event
 
 
 class EvaluationResult(db.Model):
@@ -33,12 +33,66 @@ class EvaluationResult(db.Model):
     user = db.relationship("User", back_populates="evaluations")
     model = db.relationship("MLModel", back_populates="evaluations")
 
-    # Constraint: Ensure evaluation.user_id matches the model's owner
-    __table_args__ = (
-        CheckConstraint(
-            """
-            user_id = (SELECT user_id FROM models WHERE models.id = model_id)
-            """,
-            name="evaluation_owner_matches_model_owner"
-        ),
-    )
+    # SQLite does not allow subqueries in CHECK constraints. These triggers
+    # enforce the cross-table ownership rule whenever an evaluation is written.
+
+
+_owner_guard = """
+    SELECT CASE
+        WHEN NOT EXISTS (
+            SELECT 1
+            FROM models
+            WHERE models.id = NEW.model_id
+              AND models.user_id = NEW.user_id
+        )
+        THEN RAISE(ABORT, 'evaluation_owner_matches_model_owner')
+    END;
+"""
+
+event.listen(
+    db.metadata,
+    "after_create",
+    DDL(
+        f"""
+        CREATE TRIGGER IF NOT EXISTS evaluation_owner_matches_model_owner_insert
+        BEFORE INSERT ON evaluation_results
+        BEGIN
+            {_owner_guard}
+        END;
+        """
+    ).execute_if(dialect="sqlite"),
+)
+
+event.listen(
+    db.metadata,
+    "after_create",
+    DDL(
+        """
+        CREATE TRIGGER IF NOT EXISTS evaluation_owner_matches_model_owner_model_update
+        BEFORE UPDATE OF user_id ON models
+        WHEN EXISTS (
+            SELECT 1
+            FROM evaluation_results
+            WHERE evaluation_results.model_id = OLD.id
+              AND evaluation_results.user_id != NEW.user_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'evaluation_owner_matches_model_owner');
+        END;
+        """
+    ).execute_if(dialect="sqlite"),
+)
+
+event.listen(
+    db.metadata,
+    "after_create",
+    DDL(
+        f"""
+        CREATE TRIGGER IF NOT EXISTS evaluation_owner_matches_model_owner_update
+        BEFORE UPDATE OF user_id, model_id ON evaluation_results
+        BEGIN
+            {_owner_guard}
+        END;
+        """
+    ).execute_if(dialect="sqlite"),
+)
