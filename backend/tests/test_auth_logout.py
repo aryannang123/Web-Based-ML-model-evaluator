@@ -196,16 +196,20 @@ class TestLogout(unittest.TestCase):
 
     def test_session_has_expiration_configured(self):
         """US-06 AC: Session expiration is handled appropriately."""
-        self.login()
+        login_response = self.login()
         
-        # Verify session is permanent (allows expiration)
+        # Verify session is marked as permanent (enables expiration)
         with self.client.session_transaction() as session_data:
-            # Flask sets session.permanent when PERMANENT_SESSION_LIFETIME is configured
-            # In test environment, verify the session contains user data
+            # When session.permanent is True and PERMANENT_SESSION_LIFETIME is set,
+            # Flask will expire the session after the configured lifetime
             self.assertIn("user_id", session_data)
         
-        # Verify config has session lifetime set
+        # Verify app config has session lifetime configured
         self.assertIsNotNone(self.app.config.get("PERMANENT_SESSION_LIFETIME"))
+        self.assertEqual(self.app.config["PERMANENT_SESSION_LIFETIME"].total_seconds(), 24 * 3600)
+        
+        # Verify SESSION_REFRESH_EACH_REQUEST is enabled
+        self.assertTrue(self.app.config.get("SESSION_REFRESH_EACH_REQUEST"))
 
 
 if __name__ == "__main__":

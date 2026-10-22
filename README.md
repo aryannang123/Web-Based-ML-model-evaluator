@@ -164,26 +164,37 @@ Stores model performance metrics, confusion matrices, and classification reports
   - Support for potential future features (e.g., shared model evaluations)
 
 **Integrity Protection**:
-To prevent data inconsistency where an evaluation's `user_id` doesn't match its model's owner, **application-level validation** is enforced in the API layer.
+To prevent data inconsistency where an evaluation's `user_id` doesn't match its model's owner, **application-level validation must be enforced** in the ML training and evaluation API routes.
 
-**Implementation Notes**:
-- SQLite does not support subqueries in CHECK constraints, so database-level enforcement is not possible
-- Application logic in the ML training/evaluation routes must validate that the evaluation's user_id matches the model's owner before creating evaluation records
-- For production deployments using PostgreSQL or MySQL, a database-level CHECK constraint or trigger can be added for additional safety
+**Implementation Status**: 
+- ⚠️ ML training and evaluation routes (US-17, US-18, US-19) are currently TODO
+- When implementing these routes, ownership validation MUST be added
 
-**Recommended Application-Level Check** (to be implemented in ML routes):
+**Required Application-Level Check** (to be implemented):
 ```python
-# Before creating an evaluation
-model = MLModel.query.get(model_id)
-if model.user_id != current_user_id:
-    return jsonify({"error": "Unauthorized"}), 403
-
-evaluation = EvaluationResult(
-    user_id=current_user_id,  # Must match model.user_id
-    model_id=model_id,
-    metrics_json={...}
-)
+# Example for ML evaluation route (US-19)
+@ml_bp.route("/evaluate", methods=["POST"])
+@login_required
+def evaluate_model():
+    current_user_id = session.get("user_id")
+    model_id = request.json.get("model_id")
+    
+    # Validate model ownership before creating evaluation
+    model = MLModel.query.get(model_id)
+    if not model or model.user_id != current_user_id:
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    # Now safe to create evaluation with matching user_id
+    evaluation = EvaluationResult(
+        user_id=current_user_id,
+        model_id=model_id,
+        metrics_json={...}
+    )
+    db.session.add(evaluation)
+    db.session.commit()
 ```
+
+**Note**: SQLite does not support subqueries in CHECK constraints. For production deployments using PostgreSQL or MySQL, a database-level CHECK constraint or trigger can provide additional enforcement.
 
 ---
 

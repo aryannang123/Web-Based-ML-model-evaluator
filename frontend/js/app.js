@@ -108,6 +108,7 @@ function setupEventListeners() {
 // US-06: Handle logout
 async function handleLogout() {
     const logoutBtn = document.getElementById("logout-btn");
+    const currentUser = document.getElementById("current-user");
     
     try {
         if (logoutBtn) {
@@ -128,12 +129,40 @@ async function handleLogout() {
     } catch (error) {
         console.error("Logout failed:", error.message);
         
-        // Store error message to show on login page
-        sessionStorage.setItem("logoutMessage", error.message || "Logout failed. Please try again.");
-        sessionStorage.setItem("logoutStatus", "error");
+        // DON'T redirect on error - stay on dashboard and show error
+        if (logoutBtn) {
+            logoutBtn.disabled = false;
+            logoutBtn.textContent = "Logout";
+        }
         
-        // Still redirect to login page but show error
-        window.location.assign("/login");
+        // Show error message on the dashboard
+        // Create or update an error alert on the page
+        let errorAlert = document.getElementById("logout-error-alert");
+        if (!errorAlert) {
+            errorAlert = document.createElement("div");
+            errorAlert.id = "logout-error-alert";
+            errorAlert.className = "alert alert-danger alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3";
+            errorAlert.style.zIndex = "9999";
+            errorAlert.style.maxWidth = "500px";
+            errorAlert.innerHTML = `
+                <strong>Logout Failed:</strong> ${error.message || "Please try again."}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(errorAlert);
+        } else {
+            errorAlert.innerHTML = `
+                <strong>Logout Failed:</strong> ${error.message || "Please try again."}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            errorAlert.classList.add("show");
+        }
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            if (errorAlert) {
+                errorAlert.classList.remove("show");
+            }
+        }, 5000);
     }
 }
 
