@@ -23,6 +23,9 @@ class TestLogin(unittest.TestCase):
             SECRET_KEY = "test-only-login-key"
             SESSION_COOKIE_HTTPONLY = True
             SESSION_COOKIE_SAMESITE = "Lax"
+            SESSION_IDLE_TIMEOUT_SECONDS = 1800
+            LOGIN_RATE_LIMIT_WINDOW_SECONDS = 900
+            LOGIN_RATE_LIMIT_MAX_FAILURES = 10
             SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
             SQLALCHEMY_TRACK_MODIFICATIONS = False
             UPLOAD_FOLDER = str(storage_path / "uploads")
@@ -151,8 +154,12 @@ class TestLogin(unittest.TestCase):
         direct_dashboard_file = self.client.get("/index.html")
         algorithms = self.client.get("/api/ml/algorithms")
 
-        self.assertEqual(dashboard.status_code, 200)
-        self.assertEqual(direct_dashboard_file.status_code, 200)
+        try:
+            self.assertEqual(dashboard.status_code, 200)
+            self.assertEqual(direct_dashboard_file.status_code, 200)
+        finally:
+            dashboard.close()
+            direct_dashboard_file.close()
         self.assertEqual(algorithms.status_code, 200)
         self.assertIn("classification", algorithms.json)
 

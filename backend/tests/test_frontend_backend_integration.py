@@ -52,6 +52,23 @@ class TestFrontendBackendIntegration(unittest.TestCase):
         finally:
             response.close()
 
+    def test_cors_allows_configured_local_origin_and_rejects_unlisted_origin(self):
+        allowed = self.client.get(
+            "/api/health", headers={"Origin": "http://localhost:5000"}
+        )
+        rejected = self.client.get(
+            "/api/health", headers={"Origin": "https://untrusted.example"}
+        )
+        try:
+            self.assertEqual(
+                allowed.headers.get("Access-Control-Allow-Origin"),
+                "http://localhost:5000",
+            )
+            self.assertNotIn("Access-Control-Allow-Origin", rejected.headers)
+        finally:
+            allowed.close()
+            rejected.close()
+
     def test_frontend_javascript_is_served(self):
         response = self.client.get("/js/app.js")
         try:

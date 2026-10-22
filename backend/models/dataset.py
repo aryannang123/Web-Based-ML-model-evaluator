@@ -18,6 +18,10 @@ class Dataset(db.Model):
     row_count = db.Column(db.Integer, nullable=True)
     column_count = db.Column(db.Integer, nullable=True)
     metadata_json = db.Column(db.JSON, nullable=True)
+    is_archived = db.Column(db.Boolean, nullable=False, default=False)
+    preprocessing_json = db.Column(db.JSON, nullable=True)
+    target_column = db.Column(db.String(255), nullable=True)
+    task_type = db.Column(db.String(20), nullable=True)
 
     created_at = db.Column(
         db.DateTime,
@@ -31,4 +35,9 @@ class Dataset(db.Model):
         "MLModel",
         back_populates="dataset",
         cascade="all, delete-orphan"
+    )
+
+    versions = db.relationship(
+        "DatasetVersion", back_populates="dataset", cascade="all, delete-orphan",
+        order_by="DatasetVersion.version_number",
     )

@@ -9,6 +9,8 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default="student")
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
 
     created_at = db.Column(
         db.DateTime,
@@ -33,4 +35,8 @@ class User(db.Model):
         "EvaluationResult",
         back_populates="user",
         cascade="all, delete-orphan"
+    )
+
+    sessions = db.relationship(
+        "UserSession", back_populates="user", cascade="all, delete-orphan"
     )

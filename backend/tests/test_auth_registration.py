@@ -78,6 +78,25 @@ class TestRegistration(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_password_length_policy_has_eight_to_128_character_bounds(self):
+        short = self.valid_user()
+        short["password"] = "short7!"
+        self.assertEqual(
+            self.client.post("/api/auth/register", json=short).status_code, 400
+        )
+
+        too_long = self.valid_user()
+        too_long["password"] = "p" * 129
+        self.assertEqual(
+            self.client.post("/api/auth/register", json=too_long).status_code, 400
+        )
+
+        accepted = self.valid_user()
+        accepted["password"] = "p" * 128
+        self.assertEqual(
+            self.client.post("/api/auth/register", json=accepted).status_code, 201
+        )
+
     def test_invalid_email(self):
         user = self.valid_user()
         user["email"] = "invalid-email"

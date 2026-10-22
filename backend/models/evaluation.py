@@ -22,6 +22,7 @@ class EvaluationResult(db.Model):
     metrics_json = db.Column(db.JSON, nullable=False)
     confusion_matrix_json = db.Column(db.JSON, nullable=True)
     report_json = db.Column(db.JSON, nullable=True)
+    visualization_json = db.Column(db.JSON, nullable=True)
 
     created_at = db.Column(
         db.DateTime,
