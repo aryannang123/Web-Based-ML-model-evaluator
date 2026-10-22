@@ -247,6 +247,8 @@ Opening **http://127.0.0.1:5000** in your browser will automatically serve the f
 | `/api/health` | `GET` | Service health check |
 | `/api/auth/register` | `POST` | Register user account |
 | `/api/auth/login` | `POST` | User login session |
+| `/api/auth/logout` | `POST` | Logout and invalidate session |
+| `/api/auth/session` | `GET` | Check current session status |
 | `/api/dataset/upload` | `POST` | Upload CSV dataset & inspect columns |
 | `/api/dataset/<id>/preview` | `GET` | Preview dataset top rows and statistics |
 | `/api/ml/algorithms` | `GET` | List supported ML algorithms |

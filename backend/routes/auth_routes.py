@@ -92,6 +92,7 @@ def login():
 
     # Clear any previous session data before establishing the authenticated one.
     session.clear()
+    session.permanent = True  # Enable session expiration (US-06)
     session["user_id"] = user.id
     session["username"] = user.username
 
@@ -120,6 +121,31 @@ def current_session():
 
 @auth_bp.route("/logout", methods=["POST"])
 def logout():
-    # TODO: US-06: Implement logout and session management
-    # Assigned to: @aryannang123
-    return jsonify({"message": "Logout endpoint ready for US-06 implementation"}), 501
+    """
+    US-06: Implement logout and session management.
+    
+    Acceptance Criteria:
+    - Logged-in users can log out successfully.
+    - Logout invalidates the active session/token.
+    - After logout, protected pages cannot be accessed without logging in again.
+    - User session state is maintained while navigating the application.
+    - Session expiration is handled appropriately.
+    - Clear feedback is provided after logout.
+    """
+    user_id = session.get("user_id")
+    username = session.get("username")
+    
+    # Clear the user session
+    session.clear()
+    
+    if user_id is not None:
+        return jsonify({
+            "message": "Logout successful",
+            "redirect_url": "/login"
+        }), 200
+    else:
+        # Already logged out or no active session
+        return jsonify({
+            "message": "No active session to log out",
+            "redirect_url": "/login"
+        }), 200
