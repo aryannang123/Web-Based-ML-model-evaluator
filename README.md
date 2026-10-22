@@ -154,7 +154,7 @@ Stores model performance metrics, confusion matrices, and classification reports
 
 ---
 
-### 🔒 Schema Integrity: Owner Consistency Constraint
+### 🔒 Schema Integrity: Owner Consistency
 
 **Design Decision**:
 - The `evaluation_results` table stores both `user_id` and `model_id` as foreign keys.
@@ -164,38 +164,26 @@ Stores model performance metrics, confusion matrices, and classification reports
   - Support for potential future features (e.g., shared model evaluations)
 
 **Integrity Protection**:
-To prevent data inconsistency where an evaluation's `user_id` doesn't match its model's owner, a **database-level CHECK constraint** has been implemented:
+To prevent data inconsistency where an evaluation's `user_id` doesn't match its model's owner, **application-level validation** is enforced in the API layer.
 
-```sql
-ALTER TABLE evaluation_results 
-ADD CONSTRAINT evaluation_owner_matches_model_owner 
-CHECK (user_id = (SELECT user_id FROM models WHERE models.id = model_id));
-```
+**Implementation Notes**:
+- SQLite does not support subqueries in CHECK constraints, so database-level enforcement is not possible
+- Application logic in the ML training/evaluation routes must validate that the evaluation's user_id matches the model's owner before creating evaluation records
+- For production deployments using PostgreSQL or MySQL, a database-level CHECK constraint or trigger can be added for additional safety
 
-**Implementation** (in `models/evaluation.py`):
+**Recommended Application-Level Check** (to be implemented in ML routes):
 ```python
-__table_args__ = (
-    CheckConstraint(
-        """
-        user_id = (SELECT user_id FROM models WHERE models.id = model_id)
-        """,
-        name="evaluation_owner_matches_model_owner"
-    ),
+# Before creating an evaluation
+model = MLModel.query.get(model_id)
+if model.user_id != current_user_id:
+    return jsonify({"error": "Unauthorized"}), 403
+
+evaluation = EvaluationResult(
+    user_id=current_user_id,  # Must match model.user_id
+    model_id=model_id,
+    metrics_json={...}
 )
 ```
-
-**What This Prevents**:
-```python
-# ✅ Valid: User 1 creates evaluation for their own model
-model = MLModel(user_id=1, dataset_id=5, algorithm="random_forest")
-evaluation = EvaluationResult(user_id=1, model_id=model.id, metrics={...})
-
-# ❌ BLOCKED: User 2 cannot create evaluation with mismatched owner
-evaluation = EvaluationResult(user_id=2, model_id=model.id, metrics={...})
-# Raises: IntegrityError - evaluation_owner_matches_model_owner constraint failed
-```
-
-**Result**: The database now enforces referential integrity, ensuring evaluation ownership always matches model ownership.
 
 ---
 

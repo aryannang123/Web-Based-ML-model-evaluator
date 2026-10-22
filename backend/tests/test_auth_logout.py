@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -25,6 +26,8 @@ class TestLogout(unittest.TestCase):
             SECRET_KEY = "test-only-logout-key"
             SESSION_COOKIE_HTTPONLY = True
             SESSION_COOKIE_SAMESITE = "Lax"
+            PERMANENT_SESSION_LIFETIME = timedelta(hours=24)
+            SESSION_REFRESH_EACH_REQUEST = True
             SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
             SQLALCHEMY_TRACK_MODIFICATIONS = False
             UPLOAD_FOLDER = str(storage_path / "uploads")

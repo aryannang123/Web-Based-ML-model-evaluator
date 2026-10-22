@@ -121,14 +121,18 @@ async function handleLogout() {
         
         // Store logout success message in sessionStorage to show on login page
         sessionStorage.setItem("logoutMessage", result.message || "You have been logged out successfully");
+        sessionStorage.setItem("logoutStatus", "success");
         
         // Redirect to login page
         window.location.assign(result.redirect_url || "/login");
     } catch (error) {
         console.error("Logout failed:", error.message);
         
-        // Even if logout fails on server, show message and redirect
-        sessionStorage.setItem("logoutMessage", "You have been logged out");
+        // Store error message to show on login page
+        sessionStorage.setItem("logoutMessage", error.message || "Logout failed. Please try again.");
+        sessionStorage.setItem("logoutStatus", "error");
+        
+        // Still redirect to login page but show error
         window.location.assign("/login");
     }
 }
@@ -136,13 +140,19 @@ async function handleLogout() {
 function setupLoginForm() {
     // Display logout feedback message if present
     const logoutMessage = sessionStorage.getItem("logoutMessage");
+    const logoutStatus = sessionStorage.getItem("logoutStatus");
+    
     if (logoutMessage) {
         const loginFeedback = document.getElementById("login-feedback");
         if (loginFeedback) {
             loginFeedback.textContent = logoutMessage;
-            loginFeedback.className = "mt-3 alert alert-success";
+            // Show success in green, error in red
+            loginFeedback.className = logoutStatus === "error" 
+                ? "mt-3 alert alert-danger" 
+                : "mt-3 alert alert-success";
         }
         sessionStorage.removeItem("logoutMessage");
+        sessionStorage.removeItem("logoutStatus");
     }
     
     document.getElementById("login-form")
