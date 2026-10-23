@@ -94,12 +94,96 @@ function setupEventListeners() {
     // TODO: US-18 - Train button listener (Aryan).
     // TODO: US-19 - Render evaluation metrics and confusion matrix (Abhishek).
 
+    // US-06: Logout button listener
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", handleLogout);
+    }
+
     console.log(
         "Frontend architecture initialized. Ready for US implementation."
     );
 }
 
+// US-06: Handle logout
+async function handleLogout() {
+    const logoutBtn = document.getElementById("logout-btn");
+    const currentUser = document.getElementById("current-user");
+    
+    try {
+        if (logoutBtn) {
+            logoutBtn.disabled = true;
+            logoutBtn.textContent = "Logging out...";
+        }
+        
+        const result = await apiRequest("/auth/logout", {
+            method: "POST"
+        });
+        
+        // Store logout success message in sessionStorage to show on login page
+        sessionStorage.setItem("logoutMessage", result.message || "You have been logged out successfully");
+        sessionStorage.setItem("logoutStatus", "success");
+        
+        // Redirect to login page
+        window.location.assign(result.redirect_url || "/login");
+    } catch (error) {
+        console.error("Logout failed:", error.message);
+        
+        // DON'T redirect on error - stay on dashboard and show error
+        if (logoutBtn) {
+            logoutBtn.disabled = false;
+            logoutBtn.textContent = "Logout";
+        }
+        
+        // Show error message on the dashboard
+        // Create or update an error alert on the page
+        let errorAlert = document.getElementById("logout-error-alert");
+        if (!errorAlert) {
+            errorAlert = document.createElement("div");
+            errorAlert.id = "logout-error-alert";
+            errorAlert.className = "alert alert-danger alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3";
+            errorAlert.style.zIndex = "9999";
+            errorAlert.style.maxWidth = "500px";
+            errorAlert.innerHTML = `
+                <strong>Logout Failed:</strong> ${error.message || "Please try again."}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(errorAlert);
+        } else {
+            errorAlert.innerHTML = `
+                <strong>Logout Failed:</strong> ${error.message || "Please try again."}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            errorAlert.classList.add("show");
+        }
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            if (errorAlert) {
+                errorAlert.classList.remove("show");
+            }
+        }, 5000);
+    }
+}
+
 function setupLoginForm() {
+    // Display logout feedback message if present
+    const logoutMessage = sessionStorage.getItem("logoutMessage");
+    const logoutStatus = sessionStorage.getItem("logoutStatus");
+    
+    if (logoutMessage) {
+        const loginFeedback = document.getElementById("login-feedback");
+        if (loginFeedback) {
+            loginFeedback.textContent = logoutMessage;
+            // Show success in green, error in red
+            loginFeedback.className = logoutStatus === "error" 
+                ? "mt-3 alert alert-danger" 
+                : "mt-3 alert alert-success";
+        }
+        sessionStorage.removeItem("logoutMessage");
+        sessionStorage.removeItem("logoutStatus");
+    }
+    
     document.getElementById("login-form")
         ?.addEventListener("submit", async (event) => {
             event.preventDefault();
@@ -134,6 +218,8 @@ function setupLoginForm() {
 
 async function restoreSession() {
     const currentUser = document.getElementById("current-user");
+    const logoutBtn = document.getElementById("logout-btn");
+    
     if (!currentUser) return;
 
     try {
@@ -142,7 +228,12 @@ async function restoreSession() {
             window.location.replace("/login");
             return;
         }
+        
+        // Display username and show logout button
         currentUser.textContent = result.user.username;
+        if (logoutBtn) {
+            logoutBtn.classList.remove("d-none");
+        }
     } catch {
         window.location.replace("/login");
     }

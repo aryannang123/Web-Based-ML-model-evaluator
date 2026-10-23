@@ -83,11 +83,12 @@ def create_app(config_class=Config):
 
 if __name__ == "__main__":
     app = create_app()
-    port = int(os.environ.get("PORT", 5000))
+    host = app.config["HOST"]
+    port = app.config["PORT"]
 
     print(
         f"Starting Web-Based ML Model Evaluator backend "
-        f"on http://127.0.0.1:{port}"
+        f"on http://{host}:{port}"
     )
 
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host=host, port=port, debug=app.config["DEBUG"])

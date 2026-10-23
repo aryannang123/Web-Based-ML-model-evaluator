@@ -1,6 +1,8 @@
 
 from database.db import db
+
 from sqlalchemy import DDL, event
+
 
 
 class EvaluationResult(db.Model):
@@ -32,6 +34,7 @@ class EvaluationResult(db.Model):
 
     user = db.relationship("User", back_populates="evaluations")
     model = db.relationship("MLModel", back_populates="evaluations")
+
 
     # SQLite does not allow subqueries in CHECK constraints. These triggers
     # enforce the cross-table ownership rule whenever an evaluation is written.
