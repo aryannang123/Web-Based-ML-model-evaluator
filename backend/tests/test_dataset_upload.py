@@ -10,6 +10,7 @@ from database.db import db
 from models.dataset import Dataset
 from models.user import User
 from sqlalchemy.exc import SQLAlchemyError
+from werkzeug.security import generate_password_hash
 
 
 class TestDatasetUpload(unittest.TestCase):
@@ -44,7 +45,7 @@ class TestDatasetUpload(unittest.TestCase):
         self.user = User(
             username=f"u_{uuid4().hex[:12]}",
             email=f"{uuid4().hex}@example.com",
-            password_hash="test-hash",
+            password_hash=generate_password_hash("test-password-123"),
         )
         db.session.add(self.user)
         db.session.commit()
@@ -57,8 +58,16 @@ class TestDatasetUpload(unittest.TestCase):
             os.remove(os.path.join(self.app.config["UPLOAD_FOLDER"], name))
 
     def authenticate(self, user_id=None):
+        if user_id is None:
+            response = self.client.post(
+                "/api/auth/login",
+                json={"username": self.user.username, "password": "test-password-123"},
+            )
+            self.assertEqual(response.status_code, 200)
+            return
         with self.client.session_transaction() as test_session:
-            test_session["user_id"] = self.user.id if user_id is None else user_id
+            test_session["user_id"] = user_id
+            test_session["session_id"] = "unknown-session-id"
 
     def upload(self, contents, filename="data.csv", extra_fields=None):
         data = {"file": (io.BytesIO(contents), filename)}
@@ -163,7 +172,7 @@ class TestDatasetUpload(unittest.TestCase):
 
     def test_database_failure_rolls_back_and_removes_uploaded_file(self):
         self.authenticate()
-        with patch("routes.dataset_routes.db.session.commit", side_effect=SQLAlchemyError("test failure")):
+        with patch("routes.dataset_routes._persist_dataset", side_effect=SQLAlchemyError("test failure")):
             response = self.upload(b"a\n1\n")
 
         self.assertEqual(response.status_code, 500)

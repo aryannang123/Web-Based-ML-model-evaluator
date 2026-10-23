@@ -10,6 +10,6 @@ def init_db(app):
 
     with app.app_context():
         # Import all models so tables are registered
-        from models import user, dataset, model, evaluation  # noqa: F401
+        from models import user, dataset, model, evaluation, user_session  # noqa: F401
 
         db.create_all()

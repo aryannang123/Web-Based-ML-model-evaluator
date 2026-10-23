@@ -4,11 +4,11 @@ import os
 from uuid import uuid4
 
 import pandas as pd
-from flask import Blueprint, current_app, jsonify, request, session
+from flask import Blueprint, current_app, g, jsonify, request
 
 from database.db import db
 from models.dataset import Dataset
-from models.user import User
+from routes.auth_utils import get_owned_dataset, login_required, owned_dataset_query
 
 
 dataset_bp = Blueprint("dataset", __name__, url_prefix="/api/dataset")
@@ -35,7 +35,7 @@ def _parse_csv(contents):
 
         data_row_count = 0
         for row in rows:
-            if not row:  # Ignore blank lines, as pandas does.
+            if not row:
                 continue
             if len(row) != len(header):
                 raise ValueError(
@@ -59,20 +59,46 @@ def _parse_csv(contents):
     return frame, header
 
 
-def _authenticated_user():
-    """Return the database user identified by the signed Flask session."""
-    user_id = session.get("user_id")
-    if isinstance(user_id, bool) or not isinstance(user_id, int) or user_id <= 0:
-        return None
-    return db.session.get(User, user_id)
+def _persist_dataset(dataset):
+    """Persist a newly stored upload row."""
+    db.session.add(dataset)
+    db.session.commit()
+
+
+def _dataset_response(dataset):
+    """Return owner-visible metadata without exposing a server filesystem path."""
+    return {
+        "id": dataset.id,
+        "filename": dataset.filename,
+        "file_size": dataset.file_size,
+        "row_count": dataset.row_count,
+        "column_count": dataset.column_count,
+        "metadata": dataset.metadata_json,
+        "created_at": dataset.created_at.isoformat() if dataset.created_at else None,
+    }
+
+
+@dataset_bp.route("", methods=["GET"])
+@login_required
+def list_datasets():
+    datasets = owned_dataset_query(g.current_user.id).order_by(
+        Dataset.created_at.asc(), Dataset.id.asc()
+    ).all()
+    return jsonify({"datasets": [_dataset_response(item) for item in datasets]}), 200
+
+
+@dataset_bp.route("/<int:dataset_id>", methods=["GET"])
+@login_required
+def get_dataset(dataset_id):
+    dataset = get_owned_dataset(dataset_id, g.current_user.id)
+    if dataset is None:
+        return jsonify({"error": "Dataset not found"}), 404
+    return jsonify({"dataset": _dataset_response(dataset)}), 200
 
 
 @dataset_bp.route("/upload", methods=["POST"])
+@login_required
 def upload_dataset():
-    user = _authenticated_user()
-    if user is None:
-        return jsonify({"error": "Please log in before uploading a dataset."}), 401
-
     if "file" not in request.files:
         return jsonify({"error": "Choose a CSV file to upload."}), 400
 
@@ -88,6 +114,10 @@ def upload_dataset():
     contents = uploaded_file.read()
     if not contents:
         return jsonify({"error": "The selected CSV file is empty."}), 400
+    if len(contents) > current_app.config["MAX_CONTENT_LENGTH"]:
+        return jsonify({
+            "error": f"The upload exceeds the {current_app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB file size limit."
+        }), 413
 
     try:
         frame, columns = _parse_csv(contents)
@@ -106,7 +136,7 @@ def upload_dataset():
             destination.write(contents)
 
         dataset = Dataset(
-            user_id=user.id,
+            user_id=g.current_user.id,
             filename=original_filename,
             file_path=stored_path,
             file_size=len(contents),
@@ -114,8 +144,7 @@ def upload_dataset():
             column_count=len(columns),
             metadata_json={"columns": columns},
         )
-        db.session.add(dataset)
-        db.session.commit()
+        _persist_dataset(dataset)
     except Exception:
         db.session.rollback()
         try:
@@ -139,16 +168,18 @@ def upload_dataset():
 
 
 @dataset_bp.route("/<int:dataset_id>/preview", methods=["GET"])
+@login_required
 def preview_dataset(dataset_id):
-    # TODO: US-12: Display dataset preview
-    # Assigned to: @nidhipoojamrutha20
-    # Steps: Read first N rows of CSV and return as JSON for frontend preview table
+    if get_owned_dataset(dataset_id, g.current_user.id) is None:
+        return jsonify({"error": "Dataset not found"}), 404
+    # TODO: US-12: Display dataset preview.
     return jsonify({"message": "Dataset preview endpoint ready for US-12 implementation"}), 501
 
 
 @dataset_bp.route("/<int:dataset_id>/statistics", methods=["GET"])
+@login_required
 def dataset_statistics(dataset_id):
-    # TODO: US-13: Display dataset Statistics
-    # Assigned to: @gaganraghavan
-    # Steps: Compute summary statistics (mean, std, min, max, null counts)
+    if get_owned_dataset(dataset_id, g.current_user.id) is None:
+        return jsonify({"error": "Dataset not found"}), 404
+    # TODO: US-13: Display dataset statistics.
     return jsonify({"message": "Dataset statistics endpoint ready for US-13 implementation"}), 501
