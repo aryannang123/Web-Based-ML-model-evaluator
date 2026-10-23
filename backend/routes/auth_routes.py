@@ -1,8 +1,13 @@
+import secrets
+from datetime import datetime, timezone
+
 from flask import Blueprint, jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 from sqlalchemy.exc import IntegrityError
 from database.db import db
 from models.user import User
+from models.user_session import UserSession
+from routes.auth_utils import get_authenticated_user, revoke_current_session
 
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
@@ -90,9 +95,24 @@ def login():
     if user is None or not check_password_hash(user.password_hash, password):
         return jsonify({"error": "Invalid username or password"}), 401
 
-    # Clear any previous session data before establishing the authenticated one.
+    # Revoke any old browser session before issuing a fresh server-tracked one.
+    revoke_current_session()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    auth_session = UserSession(
+        session_id=secrets.token_urlsafe(32),
+        user_id=user.id,
+        last_seen_at=now,
+    )
+    try:
+        db.session.add(auth_session)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "Unable to establish session"}), 500
+
     session.clear()
-    session.permanent = True  # Enable session expiration (US-06)
+    session.permanent = True
+    session["session_id"] = auth_session.session_id
     session["user_id"] = user.id
     session["username"] = user.username
 
@@ -105,13 +125,8 @@ def login():
 
 @auth_bp.route("/session", methods=["GET"])
 def current_session():
-    user_id = session.get("user_id")
-    if user_id is None:
-        return jsonify({"authenticated": False}), 200
-
-    user = db.session.get(User, user_id)
+    user = get_authenticated_user()
     if user is None:
-        session.clear()
         return jsonify({"authenticated": False}), 200
 
     return jsonify({
@@ -121,31 +136,14 @@ def current_session():
 
 @auth_bp.route("/logout", methods=["POST"])
 def logout():
-    """
-    US-06: Implement logout and session management.
-    
-    Acceptance Criteria:
-    - Logged-in users can log out successfully.
-    - Logout invalidates the active session/token.
-    - After logout, protected pages cannot be accessed without logging in again.
-    - User session state is maintained while navigating the application.
-    - Session expiration is handled appropriately.
-    - Clear feedback is provided after logout.
-    """
-    user_id = session.get("user_id")
-    username = session.get("username")
-    
-    # Clear the user session
-    session.clear()
-    
-    if user_id is not None:
+    """Revoke the current server-side session and expire the browser cookie."""
+    was_active = revoke_current_session()
+    if was_active:
         return jsonify({
             "message": "Logout successful",
-            "redirect_url": "/login"
+            "redirect_url": "/login",
         }), 200
-    else:
-        # Already logged out or no active session
-        return jsonify({
-            "message": "No active session to log out",
-            "redirect_url": "/login"
-        }), 200
+    return jsonify({
+        "message": "No active session to log out",
+        "redirect_url": "/login",
+    }), 200

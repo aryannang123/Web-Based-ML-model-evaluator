@@ -45,6 +45,7 @@ class TestUS01ToUS05Acceptance(unittest.TestCase):
 
     def setUp(self):
         db.session.rollback()
+        db.session.remove()
         db.drop_all()
         db.create_all()
         self.client = self.app.test_client()

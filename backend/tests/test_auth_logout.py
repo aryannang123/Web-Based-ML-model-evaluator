@@ -1,12 +1,13 @@
 import tempfile
 import unittest
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
 from app import create_app
 from database.db import db
 from models.user import User
+from models.user_session import UserSession
 from werkzeug.security import generate_password_hash
 
 
@@ -94,10 +95,11 @@ class TestLogout(unittest.TestCase):
         logout_response = self.client.post("/api/auth/logout")
         self.assertEqual(logout_response.status_code, 200)
 
-        # Verify session is cleared
+        # Verify the signed cookie state is cleared.
         with self.client.session_transaction() as session_data:
             self.assertNotIn("user_id", session_data)
             self.assertNotIn("username", session_data)
+            self.assertNotIn("session_id", session_data)
 
     def test_after_logout_protected_pages_cannot_be_accessed(self):
         """US-06 AC: After logout, protected pages cannot be accessed without logging in again."""
@@ -194,22 +196,51 @@ class TestLogout(unittest.TestCase):
         third_logout = self.client.post("/api/auth/logout")
         self.assertEqual(third_logout.status_code, 200)
 
-    def test_session_has_expiration_configured(self):
-        """US-06 AC: Session expiration is handled appropriately."""
+    def test_session_expiration_requires_reauthentication(self):
+        """SEC-SES-2-ST-1: An idle-expired session cannot access a protected API."""
         login_response = self.login()
-        
-        # Verify session is marked as permanent (enables expiration)
+        self.assertIn("Expires=", login_response.headers.get("Set-Cookie", ""))
         with self.client.session_transaction() as session_data:
-            # When session.permanent is True and PERMANENT_SESSION_LIFETIME is set,
-            # Flask will expire the session after the configured lifetime
-            self.assertIn("user_id", session_data)
-        
-        # Verify app config has session lifetime configured
-        self.assertIsNotNone(self.app.config.get("PERMANENT_SESSION_LIFETIME"))
-        self.assertEqual(self.app.config["PERMANENT_SESSION_LIFETIME"].total_seconds(), 24 * 3600)
-        
-        # Verify SESSION_REFRESH_EACH_REQUEST is enabled
-        self.assertTrue(self.app.config.get("SESSION_REFRESH_EACH_REQUEST"))
+            self.assertTrue(session_data.permanent)
+            session_record = db.session.get(UserSession, session_data["session_id"])
+
+        self.assertEqual(
+            self.app.config["PERMANENT_SESSION_LIFETIME"], timedelta(hours=24)
+        )
+        self.assertTrue(self.app.config["SESSION_REFRESH_EACH_REQUEST"])
+        session_record.last_seen_at = (
+            datetime.now(timezone.utc).replace(tzinfo=None)
+            - timedelta(hours=24, seconds=1)
+        )
+        db.session.commit()
+
+        response = self.client.get("/api/ml/algorithms")
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json["error"], "Authentication required")
+        with self.client.session_transaction() as session_data:
+            self.assertNotIn("user_id", session_data)
+
+    def test_sec_ses_3_st_1_replayed_cookie_is_rejected_after_logout(self):
+        """SEC-SES-3-ST-1: A captured pre-logout cookie cannot be replayed."""
+        self.login()
+        old_cookie = self.client.get_cookie(self.app.config["SESSION_COOKIE_NAME"])
+        self.assertIsNotNone(old_cookie)
+
+        response = self.client.post("/api/auth/logout")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["message"], "Logout successful")
+
+        replay_client = self.app.test_client()
+        replay_client.set_cookie(
+            self.app.config["SESSION_COOKIE_NAME"], old_cookie.value
+        )
+        replay_response = replay_client.get("/api/ml/algorithms")
+
+        self.assertEqual(replay_response.status_code, 401)
+        self.assertEqual(
+            replay_response.json["error"], "Authentication required"
+        )
 
 
 if __name__ == "__main__":

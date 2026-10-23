@@ -108,61 +108,35 @@ function setupEventListeners() {
 // US-06: Handle logout
 async function handleLogout() {
     const logoutBtn = document.getElementById("logout-btn");
-    const currentUser = document.getElementById("current-user");
-    
+    const feedback = document.getElementById("logout-feedback");
+
+    if (logoutBtn) {
+        logoutBtn.disabled = true;
+        logoutBtn.textContent = "Logging out...";
+    }
+    if (feedback) {
+        feedback.classList.add("d-none");
+        feedback.textContent = "";
+    }
+
     try {
-        if (logoutBtn) {
-            logoutBtn.disabled = true;
-            logoutBtn.textContent = "Logging out...";
-        }
-        
-        const result = await apiRequest("/auth/logout", {
-            method: "POST"
-        });
-        
-        // Store logout success message in sessionStorage to show on login page
-        sessionStorage.setItem("logoutMessage", result.message || "You have been logged out successfully");
+        const result = await apiRequest("/auth/logout", {method: "POST"});
+        sessionStorage.setItem(
+            "logoutMessage",
+            result.message || "You have been logged out successfully"
+        );
         sessionStorage.setItem("logoutStatus", "success");
-        
-        // Redirect to login page
         window.location.assign(result.redirect_url || "/login");
     } catch (error) {
         console.error("Logout failed:", error.message);
-        
-        // DON'T redirect on error - stay on dashboard and show error
+        if (feedback) {
+            feedback.textContent = error.message || "Logout failed. Please try again.";
+            feedback.className = "alert alert-danger";
+        }
         if (logoutBtn) {
             logoutBtn.disabled = false;
             logoutBtn.textContent = "Logout";
         }
-        
-        // Show error message on the dashboard
-        // Create or update an error alert on the page
-        let errorAlert = document.getElementById("logout-error-alert");
-        if (!errorAlert) {
-            errorAlert = document.createElement("div");
-            errorAlert.id = "logout-error-alert";
-            errorAlert.className = "alert alert-danger alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3";
-            errorAlert.style.zIndex = "9999";
-            errorAlert.style.maxWidth = "500px";
-            errorAlert.innerHTML = `
-                <strong>Logout Failed:</strong> ${error.message || "Please try again."}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            document.body.appendChild(errorAlert);
-        } else {
-            errorAlert.innerHTML = `
-                <strong>Logout Failed:</strong> ${error.message || "Please try again."}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            errorAlert.classList.add("show");
-        }
-        
-        // Auto-dismiss after 5 seconds
-        setTimeout(() => {
-            if (errorAlert) {
-                errorAlert.classList.remove("show");
-            }
-        }, 5000);
     }
 }
 

@@ -1,11 +1,11 @@
 import os
 
-from flask import Flask, jsonify, redirect, request, session, url_for
+from flask import Flask, jsonify, redirect, request, url_for
 from flask_cors import CORS
 
 from config import Config
-from database.db import db, init_db
-from models.user import User
+from database.db import init_db
+from routes.auth_utils import get_authenticated_user
 from routes import auth_bp, dataset_bp, ml_bp
 
 
@@ -36,14 +36,7 @@ def create_app(config_class=Config):
     app.register_blueprint(ml_bp)
 
     def has_authenticated_user():
-        user_id = session.get("user_id")
-        if user_id is None:
-            return False
-
-        if db.session.get(User, user_id) is None:
-            session.clear()
-            return False
-        return True
+        return get_authenticated_user() is not None
 
     @app.before_request
     def protect_dashboard_file():

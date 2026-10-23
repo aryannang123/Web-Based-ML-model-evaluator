@@ -154,6 +154,16 @@ Stores model performance metrics, confusion matrices, and classification reports
 
 ---
 
+### 🔐 US-06 Session Handling
+
+Successful logins create a random server-side session record and place its opaque identifier in the signed Flask session cookie. Protected requests validate the record, user, revocation state, and 24-hour idle timeout. Logout revokes the server-side record and clears the browser cookie; replaying an earlier cookie does not restore access. Cookies are HttpOnly and SameSite=Lax. Set `SESSION_COOKIE_SECURE=true` when serving the application over HTTPS.
+
+### 🔐 US-07 User Data Isolation
+
+All user-specific API access is scoped to the authenticated user on the server. Dataset listing and metadata/detail requests filter by `datasets.user_id`. Model access also checks the associated dataset owner, and evaluation access checks the evaluation owner, model owner, and dataset owner together. A foreign or missing identifier returns the same not-found response. API responses omit server filesystem paths.
+
+The CSV upload endpoint (US-08) and model training/evaluation creation endpoints (US-18/US-19) are still planned work. When those are implemented, they must assign ownership from the authenticated session and use the ownership helpers; a client-supplied owner ID is never trusted. Artifact download routes must apply the same model ownership check before serving a file.
+
 ### 🔒 Schema Integrity: Owner Consistency
 
 **Design Decision**:
@@ -164,34 +174,23 @@ Stores model performance metrics, confusion matrices, and classification reports
   - Support for potential future features (e.g., shared model evaluations)
 
 **Integrity Protection**:
-To prevent data inconsistency where an evaluation's `user_id` doesn't match its model's owner, **application-level validation must be enforced** in the ML training and evaluation API routes.
+Evaluation reads require `evaluation_results.user_id`, `models.user_id`, and the associated `datasets.user_id` to match the authenticated user. This prevents inconsistent cross-owner rows from being returned. SQLite does not permit the cross-table subquery required for a `CHECK` constraint.
 
-**Implementation Status**: 
-- ⚠️ ML training and evaluation routes (US-17, US-18, US-19) are currently TODO
-- When implementing these routes, ownership validation MUST be added
+**Implementation Status**:
+- ✅ Read/list endpoints apply owner filters for datasets, models, and evaluation results.
+- ⚠️ Model training and evaluation creation routes (US-18/US-19) remain TODO. They must assign the current session's owner and validate the selected dataset/model with `get_owned_dataset` or `get_owned_model` before writing records.
 
-**Required Application-Level Check** (to be implemented):
+**Required write-path check** (when US-18/US-19 are implemented):
 ```python
-# Example for ML evaluation route (US-19)
-@ml_bp.route("/evaluate", methods=["POST"])
-@login_required
-def evaluate_model():
-    current_user_id = session.get("user_id")
-    model_id = request.json.get("model_id")
-    
-    # Validate model ownership before creating evaluation
-    model = MLModel.query.get(model_id)
-    if not model or model.user_id != current_user_id:
-        return jsonify({"error": "Unauthorized"}), 403
-    
-    # Now safe to create evaluation with matching user_id
-    evaluation = EvaluationResult(
-        user_id=current_user_id,
-        model_id=model_id,
-        metrics_json={...}
-    )
-    db.session.add(evaluation)
-    db.session.commit()
+model = get_owned_model(model_id, g.current_user.id)
+if model is None:
+    return jsonify({"error": "Model not found"}), 404
+
+evaluation = EvaluationResult(
+    user_id=g.current_user.id,
+    model_id=model.id,
+    metrics_json=metrics,
+)
 ```
 
 **Note**: SQLite does not support subqueries in CHECK constraints. For production deployments using PostgreSQL or MySQL, a database-level CHECK constraint or trigger can provide additional enforcement.
@@ -248,11 +247,18 @@ Opening **http://127.0.0.1:5000** in your browser will automatically serve the f
 | `/api/auth/login` | `POST` | User login session |
 | `/api/auth/logout` | `POST` | Logout and invalidate session |
 | `/api/auth/session` | `GET` | Check current session status |
-| `/api/dataset/upload` | `POST` | Upload CSV dataset & inspect columns |
-| `/api/dataset/<id>/preview` | `GET` | Preview dataset top rows and statistics |
+| `/api/dataset` | `GET` | List the authenticated user's datasets |
+| `/api/dataset/<id>` | `GET` | Read owner-scoped dataset metadata |
+| `/api/dataset/upload` | `POST` | CSV upload (planned: US-08) |
+| `/api/dataset/<id>/preview` | `GET` | Preview (planned: US-12; ownership check is active) |
+| `/api/dataset/<id>/statistics` | `GET` | Statistics (planned: US-13; ownership check is active) |
 | `/api/ml/algorithms` | `GET` | List supported ML algorithms |
-| `/api/ml/train` | `POST` | Train model, evaluate metrics, and save model |
-| `/api/ml/evaluations/<user_id>` | `GET` | List evaluation history for user |
+| `/api/ml/models` | `GET` | List the authenticated user's model runs |
+| `/api/ml/models/<id>` | `GET` | Read an owner-scoped model run |
+| `/api/ml/evaluations` | `GET` | List the authenticated user's evaluation results |
+| `/api/ml/evaluations/<id>` | `GET` | Read an owner-scoped evaluation result |
+| `/api/ml/train` | `POST` | Training (planned: US-18) |
+| `/api/ml/evaluate` | `POST` | Evaluation creation (planned: US-19) |
 
 ---
 
