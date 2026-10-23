@@ -88,7 +88,9 @@ async function checkBackendHealth() {
 // Set up frontend event listeners.
 function setupEventListeners() {
     // US-03: Frontend-backend communication.
-    // TODO: US-08 - Connect file upload form (Nidhi).
+    // US-08: CSV upload form.
+    document.getElementById("upload-form")
+        ?.addEventListener("submit", uploadDataset);
     // TODO: US-15 - Target column dropdown listener (Abhishek).
     // TODO: US-16 - Split ratio range slider listener (Nidhi).
     // TODO: US-18 - Train button listener (Aryan).
@@ -103,6 +105,55 @@ function setupEventListeners() {
     console.log(
         "Frontend architecture initialized. Ready for US implementation."
     );
+}
+
+async function uploadDataset(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const fileInput = document.getElementById("csv-file");
+    const feedback = document.getElementById("upload-feedback");
+    const button = document.getElementById("upload-btn");
+
+    if (!fileInput.files.length) {
+        showUploadFeedback("Choose a CSV file to upload.", false);
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Uploading…";
+    feedback.classList.remove("d-none", "alert-success", "alert-danger");
+    feedback.classList.add("alert-info");
+    feedback.textContent = "Validating and uploading your CSV…";
+
+    try {
+        const result = await apiRequest("/dataset/upload", {
+            method: "POST",
+            body: new FormData(form)
+        });
+        showUploadFeedback(
+            `${result.filename} uploaded successfully: ${result.row_count} rows and ${result.column_count} columns.`,
+            true
+        );
+        document.getElementById("dataset-meta").textContent =
+            `${result.row_count} rows · ${result.column_count} columns`;
+        form.reset();
+    } catch (error) {
+        showUploadFeedback(
+            error.message || "Upload failed. Please try another CSV file.",
+            false
+        );
+    } finally {
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-upload me-1"></i>Upload & Inspect';
+    }
+}
+
+function showUploadFeedback(message, success) {
+    const feedback = document.getElementById("upload-feedback");
+    feedback.classList.remove("d-none", "alert-info", "alert-success", "alert-danger");
+    feedback.classList.add(success ? "alert-success" : "alert-danger");
+    feedback.textContent = message;
 }
 
 // US-06: Handle logout

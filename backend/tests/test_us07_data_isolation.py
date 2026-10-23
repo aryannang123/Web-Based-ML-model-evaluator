@@ -11,6 +11,7 @@ from models.evaluation import EvaluationResult
 from models.model import MLModel
 from models.user import User
 from werkzeug.security import generate_password_hash
+from sqlalchemy.exc import IntegrityError
 
 
 class TestUserDataIsolation(unittest.TestCase):
@@ -117,16 +118,7 @@ class TestUserDataIsolation(unittest.TestCase):
             metrics_json={"r2": 0.8},
             report_json={"summary": "owner-b-report"},
         )
-        cls.mismatched_evaluation = EvaluationResult(
-            user_id=cls.user_a.id,
-            model_id=cls.model_b.id,
-            metrics_json={"accuracy": 1.0},
-        )
-        db.session.add_all([
-            cls.evaluation_a,
-            cls.evaluation_b,
-            cls.mismatched_evaluation,
-        ])
+        db.session.add_all([cls.evaluation_a, cls.evaluation_b])
         db.session.commit()
 
     @classmethod
@@ -244,21 +236,25 @@ class TestUserDataIsolation(unittest.TestCase):
         self.assertNotIn(
             self.mismatched_model.id, [item["id"] for item in model_list]
         )
-        self.assertNotIn(
-            self.mismatched_evaluation.id,
-            [item["id"] for item in evaluation_list],
-        )
         self.assertEqual(
             self.client_a.get(
                 f"/api/ml/models/{self.mismatched_model.id}"
             ).status_code,
             404,
         )
+        # The database integrity trigger rejects cross-owner evaluations before
+        # they can become visible through any API endpoint.
+        invalid_evaluation = EvaluationResult(
+            user_id=self.user_a.id,
+            model_id=self.model_b.id,
+            metrics_json={"accuracy": 1.0},
+        )
+        db.session.add(invalid_evaluation)
+        with self.assertRaises(IntegrityError):
+            db.session.commit()
+        db.session.rollback()
         self.assertEqual(
-            self.client_a.get(
-                f"/api/ml/evaluations/{self.mismatched_evaluation.id}"
-            ).status_code,
-            404,
+            self.client_a.get("/api/ml/evaluations").status_code, 200
         )
 
     def test_nfr_4_st_1_anonymous_direct_requests_are_rejected(self):
