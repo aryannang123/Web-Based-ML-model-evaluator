@@ -264,7 +264,7 @@ Opening **http://127.0.0.1:5000** in your browser will automatically serve the f
 
 `POST /api/dataset/upload` accepts a multipart form field named `file`. The endpoint requires a valid Flask session containing the authenticated user's `user_id`; it does not accept ownership from request data. It accepts readable UTF-8 CSV files up to the configured 16 MB request limit, requires unique non-empty headers and consistent row widths, stores files under `backend/uploads/` with server-generated names, and returns the dataset ID, original filename, row and column counts, and column names. Failed database writes are rolled back and the new file is removed.
 
-The login and logout endpoints are still placeholders in this repository. Uploads therefore return HTTP 401 until Issue #5 implements login and sets the verified user ID in the Flask session. This change does not alter registration, login, or logout behavior.
+The Issue #5 login endpoint establishes the authenticated Flask session required by uploads. Uploads return HTTP 401 when no valid session is present. Logout remains a placeholder for Issue #6.
 
 #### macOS setup and tests
 

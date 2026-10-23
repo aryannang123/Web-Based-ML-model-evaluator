@@ -73,9 +73,12 @@ def create_app(config_class=Config):
 
     @app.errorhandler(RequestEntityTooLarge)
     def handle_upload_too_large(_error):
-        return jsonify({
-            "error": f"The upload exceeds the {app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB file size limit."
-        }), 413
+        limit = app.config.get("MAX_CONTENT_LENGTH")
+        if limit:
+            message = f"The upload exceeds the {limit // (1024 * 1024)} MB file size limit."
+        else:
+            message = "The uploaded file exceeds the allowed size limit."
+        return jsonify({"error": message}), 413
 
     return app
 

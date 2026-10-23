@@ -114,9 +114,10 @@ def upload_dataset():
     contents = uploaded_file.read()
     if not contents:
         return jsonify({"error": "The selected CSV file is empty."}), 400
-    if len(contents) > current_app.config["MAX_CONTENT_LENGTH"]:
+    max_content_length = current_app.config.get("MAX_CONTENT_LENGTH")
+    if max_content_length is not None and len(contents) > max_content_length:
         return jsonify({
-            "error": f"The upload exceeds the {current_app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)} MB file size limit."
+            "error": f"The upload exceeds the {max_content_length // (1024 * 1024)} MB file size limit."
         }), 413
 
     try:
