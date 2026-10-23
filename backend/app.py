@@ -75,7 +75,19 @@ def create_app(config_class=Config):
     def handle_upload_too_large(_error):
         limit = app.config.get("MAX_CONTENT_LENGTH")
         if limit:
-            message = f"The upload exceeds the {limit // (1024 * 1024)} MB file size limit."
+            mib = 1024 * 1024
+            kib = 1024
+            if limit % mib == 0:
+                formatted_limit = f"{limit // mib} MiB"
+            elif limit >= mib:
+                formatted_limit = f"{limit / mib:.1f} MiB"
+            elif limit % kib == 0:
+                formatted_limit = f"{limit // kib} KiB"
+            else:
+                formatted_limit = f"{limit} bytes"
+            message = (
+                f"The upload exceeds the configured {formatted_limit} request-size limit."
+            )
         else:
             message = "The uploaded file exceeds the allowed size limit."
         return jsonify({"error": message}), 413

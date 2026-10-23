@@ -27,5 +27,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
     SAVED_MODELS_FOLDER = os.path.join(BASE_DIR, "saved_models")
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB max dataset size
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MiB request body, including multipart overhead
     ALLOWED_EXTENSIONS = {"csv"}
+    MIN_DATA_ROWS = 2
+    MIN_DATA_COLUMNS = 2  # At least one feature and one target column

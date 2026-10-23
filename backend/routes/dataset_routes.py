@@ -14,8 +14,11 @@ from routes.auth_utils import get_owned_dataset, login_required, owned_dataset_q
 dataset_bp = Blueprint("dataset", __name__, url_prefix="/api/dataset")
 
 
-def _parse_csv(contents):
+def _parse_csv(contents, min_data_rows=2, min_data_columns=2):
     """Validate a UTF-8 CSV and return its frame and original header names."""
+    if b"\x00" in contents:
+        raise ValueError("The CSV contains binary NUL characters and cannot be read.")
+
     try:
         text = contents.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
@@ -32,8 +35,12 @@ def _parse_csv(contents):
             raise ValueError("Every CSV column must have a non-empty header.")
         if len(set(normalized_headers)) != len(normalized_headers):
             raise ValueError("CSV column headers must be unique.")
+        if len(header) < min_data_columns:
+            raise ValueError(
+                f"The CSV must contain at least {min_data_columns} columns "
+                "(one feature and one target)."
+            )
 
-        data_row_count = 0
         for row in rows:
             if not row:
                 continue
@@ -41,20 +48,31 @@ def _parse_csv(contents):
                 raise ValueError(
                     "Each CSV row must contain the same number of fields as the header."
                 )
-            data_row_count += 1
+            if all(not value.strip() for value in row):
+                raise ValueError("The CSV contains an empty data row.")
     except csv.Error as exc:
         raise ValueError("The CSV file is malformed and could not be parsed.") from exc
-
-    if data_row_count == 0:
-        raise ValueError("The CSV file must contain at least one data row.")
 
     try:
         frame = pd.read_csv(io.BytesIO(contents), encoding="utf-8-sig")
     except (pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeDecodeError, ValueError) as exc:
         raise ValueError("The CSV file is malformed and could not be parsed.") from exc
 
-    if frame.empty or frame.shape[1] == 0 or frame.dropna(how="all").empty:
-        raise ValueError("The CSV file must contain at least one non-empty data row.")
+    frame = frame.dropna(how="all")
+    if frame.shape[1] < min_data_columns:
+        raise ValueError(
+            f"The CSV must contain at least {min_data_columns} columns "
+            "(one feature and one target)."
+        )
+    if len(frame.index) < min_data_rows:
+        raise ValueError(
+            f"The CSV must contain at least {min_data_rows} non-empty data rows."
+        )
+    usable_columns = frame.notna().any(axis=0).sum()
+    if usable_columns < min_data_columns:
+        raise ValueError(
+            f"The CSV must contain at least {min_data_columns} columns with data."
+        )
 
     return frame, header
 
@@ -114,14 +132,12 @@ def upload_dataset():
     contents = uploaded_file.read()
     if not contents:
         return jsonify({"error": "The selected CSV file is empty."}), 400
-    max_content_length = current_app.config.get("MAX_CONTENT_LENGTH")
-    if max_content_length is not None and len(contents) > max_content_length:
-        return jsonify({
-            "error": f"The upload exceeds the {max_content_length // (1024 * 1024)} MB file size limit."
-        }), 413
-
     try:
-        frame, columns = _parse_csv(contents)
+        frame, columns = _parse_csv(
+            contents,
+            min_data_rows=current_app.config.get("MIN_DATA_ROWS", 2),
+            min_data_columns=current_app.config.get("MIN_DATA_COLUMNS", 2),
+        )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 

@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from app import create_app
 from database.db import db
@@ -70,6 +71,21 @@ class TestFrontendBackendIntegration(unittest.TestCase):
         finally:
             response.close()
 
+    def test_us08_csv_upload_form_and_confirmation_are_wired(self):
+        frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+        page = (frontend_dir / "index.html").read_text(encoding="utf-8")
+        script_path = frontend_dir / "js" / "app.js"
+        script = script_path.read_text(encoding="utf-8")
 
+        self.assertIn('id="upload-form"', page)
+        self.assertIn('type="file"', page)
+        self.assertIn('accept=".csv"', page)
+        self.assertIn('id="upload-feedback"', page)
+        self.assertIn('"upload-form"', script)
+        self.assertIn('addEventListener("submit", uploadDataset)', script)
+        self.assertIn('body: new FormData(form)', script)
+        self.assertIn("uploaded successfully", script)
+        self.assertIn("result.row_count", script)
+        self.assertIn("result.column_count", script)
 if __name__ == "__main__":
     unittest.main()

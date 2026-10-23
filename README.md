@@ -162,7 +162,7 @@ Successful logins create a random server-side session record and place its opaqu
 
 All user-specific API access is scoped to the authenticated user on the server. Dataset listing and metadata/detail requests filter by `datasets.user_id`. Model access also checks the associated dataset owner, and evaluation access checks the evaluation owner, model owner, and dataset owner together. A foreign or missing identifier returns the same not-found response. API responses omit server filesystem paths.
 
-The CSV upload endpoint (US-08) and model training/evaluation creation endpoints (US-18/US-19) are still planned work. When those are implemented, they must assign ownership from the authenticated session and use the ownership helpers; a client-supplied owner ID is never trusted. Artifact download routes must apply the same model ownership check before serving a file.
+CSV upload (US-08 to US-10) is implemented and assigns dataset ownership from the authenticated session; a client-supplied owner ID is never trusted. Model training/evaluation creation (US-18/US-19) remains planned and must use the same owner-scoped lookups. Artifact download routes must apply the model ownership check before serving a file.
 
 ### 🔒 Schema Integrity: Owner Consistency
 
@@ -249,7 +249,7 @@ Opening **http://127.0.0.1:5000** in your browser will automatically serve the f
 | `/api/auth/session` | `GET` | Check current session status |
 | `/api/dataset` | `GET` | List the authenticated user's datasets |
 | `/api/dataset/<id>` | `GET` | Read owner-scoped dataset metadata |
-| `/api/dataset/upload` | `POST` | CSV upload (planned: US-08) |
+| `/api/dataset/upload` | `POST` | Validate, store, and record authenticated CSV uploads (US-08 to US-10) |
 | `/api/dataset/<id>/preview` | `GET` | Preview (planned: US-12; ownership check is active) |
 | `/api/dataset/<id>/statistics` | `GET` | Statistics (planned: US-13; ownership check is active) |
 | `/api/ml/algorithms` | `GET` | List supported ML algorithms |
@@ -260,11 +260,11 @@ Opening **http://127.0.0.1:5000** in your browser will automatically serve the f
 | `/api/ml/train` | `POST` | Training (planned: US-18) |
 | `/api/ml/evaluate` | `POST` | Evaluation creation (planned: US-19) |
 
-### CSV dataset upload (Issue #8)
+### CSV dataset upload and validation (US-08 to US-10)
 
-`POST /api/dataset/upload` accepts a multipart form field named `file`. The endpoint requires a valid Flask session containing the authenticated user's `user_id`; it does not accept ownership from request data. It accepts readable UTF-8 CSV files up to the configured 16 MB request limit, requires unique non-empty headers and consistent row widths, stores files under `backend/uploads/` with server-generated names, and returns the dataset ID, original filename, row and column counts, and column names. Failed database writes are rolled back and the new file is removed.
+`POST /api/dataset/upload` accepts a multipart form field named `file` and requires a verified login session. CSV input must be UTF-8 (with an optional BOM), contain at least two non-empty data rows and two columns (a feature and a target), have unique non-empty headers, consistent row widths, and at least two columns containing data; entirely empty data rows and binary NUL characters are rejected. Unsupported extensions, empty or malformed files, and invalid structures return clear JSON errors. The configured 16 MiB request-body limit is enforced with HTTP 413; it includes multipart form overhead.
 
-The Issue #5 login endpoint establishes the authenticated Flask session required by uploads. Uploads return HTTP 401 when no valid session is present. Logout remains a placeholder for Issue #6.
+Accepted files are stored under `backend/uploads/` with server-generated names. The database records the original filename, stored path, file size, row and column counts, column names, upload timestamp, and the authenticated user's ID. Upload responses include the dataset ID and summary metadata. The owner-scoped `GET /api/dataset` and `GET /api/dataset/<id>` endpoints retrieve the current user's metadata. Failed database writes are rolled back and the newly created file is removed. Tests are in `backend/tests/test_dataset_upload.py`.
 
 #### macOS setup and tests
 

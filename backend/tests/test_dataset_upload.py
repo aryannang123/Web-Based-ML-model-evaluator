@@ -26,6 +26,8 @@ class TestDatasetUpload(unittest.TestCase):
             UPLOAD_FOLDER = os.path.join(cls.temp_dir.name, "uploads")
             SAVED_MODELS_FOLDER = os.path.join(cls.temp_dir.name, "models")
             MAX_CONTENT_LENGTH = 16 * 1024 * 1024
+            MIN_DATA_ROWS = 2
+            MIN_DATA_COLUMNS = 2
 
         cls.app = create_app(TestConfig)
         cls.context = cls.app.app_context()
@@ -77,13 +79,13 @@ class TestDatasetUpload(unittest.TestCase):
 
     def test_valid_upload_persists_metadata_and_uses_unique_server_path(self):
         self.authenticate()
-        contents = b"name,score\nAda,98\nLin,95\n"
+        contents = b"name,score\nAda,98\nLin,95\nGrace,97\n"
 
         response = self.upload(contents, "../../students.csv")
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json["filename"], "../../students.csv")
-        self.assertEqual(response.json["row_count"], 2)
+        self.assertEqual(response.json["row_count"], 3)
         self.assertEqual(response.json["column_count"], 2)
         self.assertEqual(response.json["columns"], ["name", "score"])
         dataset = db.session.get(Dataset, response.json["dataset_id"])
@@ -91,7 +93,7 @@ class TestDatasetUpload(unittest.TestCase):
         self.assertEqual(dataset.user_id, self.user.id)
         self.assertEqual(dataset.filename, "../../students.csv")
         self.assertEqual(dataset.file_size, len(contents))
-        self.assertEqual(dataset.row_count, 2)
+        self.assertEqual(dataset.row_count, 3)
         self.assertEqual(dataset.column_count, 2)
         self.assertEqual(dataset.metadata_json, {"columns": ["name", "score"]})
         self.assertEqual(os.path.dirname(dataset.file_path), os.path.abspath(self.app.config["UPLOAD_FOLDER"]))
@@ -103,15 +105,38 @@ class TestDatasetUpload(unittest.TestCase):
         self.assertEqual(second.status_code, 201)
         self.assertNotEqual(dataset.file_path, db.session.get(Dataset, second.json["dataset_id"]).file_path)
 
+    def test_csv_meeting_the_two_row_two_column_minimum_is_accepted(self):
+        self.authenticate()
+
+        response = self.upload(b"feature,target\n1,yes\n2,no\n")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json["row_count"], 2)
+        self.assertEqual(response.json["column_count"], 2)
+
     def test_upload_requires_a_verified_session_user(self):
         response = self.upload(b"a\n1\n")
         self.assertEqual(response.status_code, 401)
         self.assertEqual(Dataset.query.count(), 0)
 
-    def test_request_user_id_cannot_supply_ownership(self):
-        response = self.upload(b"a\n1\n", extra_fields={"user_id": str(self.user.id)})
-        self.assertEqual(response.status_code, 401)
-        self.assertEqual(Dataset.query.count(), 0)
+    def test_request_user_id_cannot_override_authenticated_owner(self):
+        self.authenticate()
+        other_user = User(
+            username=f"other_{uuid4().hex[:12]}",
+            email=f"{uuid4().hex}@example.com",
+            password_hash=generate_password_hash("other-password-123"),
+        )
+        db.session.add(other_user)
+        db.session.commit()
+
+        response = self.upload(
+            b"feature,target\n1,yes\n2,no\n",
+            extra_fields={"user_id": str(other_user.id)},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        dataset = db.session.get(Dataset, response.json["dataset_id"])
+        self.assertEqual(dataset.user_id, self.user.id)
 
     def test_unknown_session_user_is_rejected(self):
         self.authenticate(user_id=self.user.id + 1000)
@@ -144,8 +169,13 @@ class TestDatasetUpload(unittest.TestCase):
             (b"name,name\nAda,Lovelace\n", "unique"),
             (b"name,score\nAda\n", "same number of fields"),
             (b'name,score\n"Ada,98\n', "malformed"),
-            (b"name,score\n", "at least one data row"),
-            (b"name,score\n,\n,\n", "non-empty data row"),
+            (b"name,score\n", "at least 2 non-empty data rows"),
+            (b"name,score\nAda,1\n", "at least 2 non-empty data rows"),
+            (b"name,score\n,\n,\n", "empty data row"),
+            (b"name,score\nNA,NA\nNA,NA\n", "at least 2 non-empty data rows"),
+            (b"feature,target\n1,\n2,\n", "columns with data"),
+            (b"name\nAda\nLin\n", "at least 2 columns"),
+            (b"name,score\nAda,1\x00\nLin,2\n", "NUL"),
             (b"name\n\xff\n", "UTF-8"),
         ]
 
@@ -166,14 +196,14 @@ class TestDatasetUpload(unittest.TestCase):
         finally:
             self.app.config["MAX_CONTENT_LENGTH"] = original_limit
         self.assertEqual(response.status_code, 413)
-        self.assertIn("size limit", response.json["error"].lower())
+        self.assertIn("128 bytes request-size limit", response.json["error"].lower())
         self.assertEqual(Dataset.query.count(), 0)
         self.assertEqual(os.listdir(self.app.config["UPLOAD_FOLDER"]), [])
 
     def test_database_failure_rolls_back_and_removes_uploaded_file(self):
         self.authenticate()
         with patch("routes.dataset_routes._persist_dataset", side_effect=SQLAlchemyError("test failure")):
-            response = self.upload(b"a\n1\n")
+            response = self.upload(b"feature,target\n1,yes\n2,no\n")
 
         self.assertEqual(response.status_code, 500)
         self.assertIn("could not be saved", response.json["error"].lower())
