@@ -87,5 +87,17 @@ class TestFrontendBackendIntegration(unittest.TestCase):
         self.assertIn("uploaded successfully", script)
         self.assertIn("result.row_count", script)
         self.assertIn("result.column_count", script)
+
+    def test_us16_split_slider_updates_and_is_sent_to_evaluation(self):
+        frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+        page = (frontend_dir / "index.html").read_text(encoding="utf-8")
+        script = (frontend_dir / "js" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="split-range"', page)
+        self.assertIn('value="0.2"', page)
+        self.assertIn("updateSplitDisplay", script)
+        self.assertIn('addEventListener("input", updateSplitDisplay)', script)
+        self.assertIn('apiRequest("/ml/evaluate"', script)
+        self.assertIn("test_size: Number(document.getElementById(\"split-range\").value)", script)
 if __name__ == "__main__":
     unittest.main()
