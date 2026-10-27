@@ -87,5 +87,19 @@ class TestFrontendBackendIntegration(unittest.TestCase):
         self.assertIn("uploaded successfully", script)
         self.assertIn("result.row_count", script)
         self.assertIn("result.column_count", script)
+
+    def test_us12_preview_is_loaded_after_upload_and_rendered_safely(self):
+        frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+        page = (frontend_dir / "index.html").read_text(encoding="utf-8")
+        script = (frontend_dir / "js" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="preview-status"', page)
+        self.assertIn('id="preview-sample-label"', page)
+        self.assertIn("await loadDatasetPreview(result.dataset_id)", script)
+        self.assertIn("/preview", script)
+        self.assertIn("preview.data_types[column]", script)
+        self.assertIn("preview.row_count", script)
+        self.assertIn("cell.textContent", script)
+        self.assertNotIn("innerHTML = row", script)
 if __name__ == "__main__":
     unittest.main()

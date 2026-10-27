@@ -1,6 +1,7 @@
 
 import csv
 import io
+import math
 import os
 from uuid import uuid4
 
@@ -383,15 +384,79 @@ def replace_dataset(dataset_id):
 @dataset_bp.route("/<int:dataset_id>/preview", methods=["GET"])
 @login_required
 def preview_dataset(dataset_id):
-    """Dataset preview endpoint reserved for US-12."""
-    if get_owned_dataset(dataset_id, g.current_user.id) is None:
+    dataset = get_owned_dataset(dataset_id, g.current_user.id)
+    if dataset is None:
         return jsonify({"error": "Dataset not found"}), 404
 
-    # TODO: US-12: Display dataset preview.
-    return jsonify({
-        "message": "Dataset preview endpoint ready for US-12 implementation"
-    }), 501
+    # Uploads are stored beneath UPLOAD_FOLDER. Validate the persisted path as
+    # well, so a damaged database row cannot make this endpoint read an
+    # arbitrary server file.
+    upload_folder = os.path.realpath(current_app.config["UPLOAD_FOLDER"])
+    stored_path = os.path.realpath(dataset.file_path)
+    try:
+        inside_upload_folder = os.path.commonpath([upload_folder, stored_path]) == upload_folder
+    except ValueError:
+        inside_upload_folder = False
+    if not inside_upload_folder or not os.path.isfile(stored_path):
+        return jsonify({"error": "The dataset file is missing or unavailable."}), 404
 
+    try:
+        # Chunked parsing bounds memory use while still counting every row.
+        # Dtypes are combined across chunks so later mixed values are noticed.
+        sample_rows = []
+        column_names = None
+        inferred_dtypes = {}
+        row_count = 0
+        for chunk in pd.read_csv(stored_path, chunksize=10000):
+            if column_names is None:
+                column_names = [str(name) for name in chunk.columns]
+                inferred_dtypes = {str(name): str(chunk[name].dtype) for name in chunk.columns}
+            else:
+                for name in chunk.columns:
+                    key = str(name)
+                    previous = inferred_dtypes[key]
+                    current = str(chunk[name].dtype)
+                    if previous == current:
+                        continue
+                    if previous.startswith(("int", "uint")) and current.startswith(("int", "uint")):
+                        continue
+                    if previous.startswith(("int", "uint", "float")) and current.startswith(("int", "uint", "float")):
+                        inferred_dtypes[key] = "float64"
+                    else:
+                        inferred_dtypes[key] = "object"
+            row_count += len(chunk.index)
+            if len(sample_rows) < 10:
+                sample_rows.extend(chunk.head(10 - len(sample_rows)).to_dict(orient="records"))
+    except (OSError, PermissionError):
+        return jsonify({"error": "The dataset file could not be read."}), 500
+    except (pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeDecodeError, ValueError) as exc:
+        current_app.logger.info("Could not parse dataset preview for dataset %s: %s", dataset_id, exc)
+        return jsonify({"error": "The dataset CSV is malformed or unreadable."}), 400
+
+    def json_value(value):
+        if pd.isna(value):
+            return None
+        if hasattr(value, "item"):
+            value = value.item()
+        if isinstance(value, float) and not math.isfinite(value):
+            return None
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return str(value)
+
+    rows = [
+        {str(name): json_value(value) for name, value in row.items()}
+        for row in sample_rows
+    ]
+    return jsonify({
+        "dataset_id": dataset.id,
+        "columns": column_names or [],
+        "data_types": {name: inferred_dtypes[name] for name in (column_names or [])},
+        "rows": rows,
+        "row_count": row_count,
+        "column_count": len(column_names or []),
+        "sample_size": len(rows),
+    }), 200
 
 @dataset_bp.route("/<int:dataset_id>/statistics", methods=["GET"])
 @login_required
