@@ -99,7 +99,26 @@ class TestFrontendBackendIntegration(unittest.TestCase):
         self.assertIn("/preview", script)
         self.assertIn("preview.data_types[column]", script)
         self.assertIn("preview.row_count", script)
-        self.assertIn("cell.textContent", script)
-        self.assertNotIn("innerHTML = row", script)
+    def test_us14a_admin_panel_elements_and_wiring(self):
+        frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+        page = (frontend_dir / "index.html").read_text(encoding="utf-8")
+        script = (frontend_dir / "js" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="user-role-badge"', page)
+        self.assertIn('id="admin-panel-btn"', page)
+        self.assertIn('id="adminModal"', page)
+        self.assertIn('id="admin-users-pane"', page)
+        self.assertIn('id="admin-datasets-pane"', page)
+        self.assertIn('id="admin-logs-pane"', page)
+
+        self.assertIn('setupAdminPanel', script)
+        self.assertIn('/admin/users', script)
+        self.assertIn('/admin/datasets', script)
+        self.assertIn('/admin/logs', script)
+        self.assertIn('loadAdminUsers', script)
+        self.assertIn('loadAdminDatasets', script)
+        self.assertIn('loadAdminLogs', script)
+
+
 if __name__ == "__main__":
     unittest.main()

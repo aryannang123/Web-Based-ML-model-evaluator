@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setupEventListeners();
     setupLoginForm();
     setupRegistrationForm();
+    setupAdminPanel();
     restoreSession();
 });
 
@@ -561,6 +562,23 @@ async function restoreSession() {
 
         currentUser.textContent = result.user.username;
 
+        const roleBadge = document.getElementById("user-role-badge");
+        const adminBtn = document.getElementById("admin-panel-btn");
+        const userRole = result.user.role || "student";
+
+        if (roleBadge) {
+            roleBadge.textContent = userRole;
+            roleBadge.classList.remove("d-none");
+        }
+
+        if (adminBtn) {
+            if (userRole === "admin") {
+                adminBtn.classList.remove("d-none");
+            } else {
+                adminBtn.classList.add("d-none");
+            }
+        }
+
         if (logoutBtn) {
             logoutBtn.classList.remove("d-none");
         }
@@ -617,4 +635,157 @@ function setupRegistrationForm() {
                 console.error("Registration failed:", error.message);
             }
         });
+}
+
+// ─── Administrative Control Center (US-14a / FR-7.1, 7.2, 7.3) ───────────────
+
+function setupAdminPanel() {
+    const adminModal = document.getElementById("adminModal");
+    if (!adminModal) return;
+
+    adminModal.addEventListener("show.bs.modal", () => {
+        loadAdminUsers();
+        loadAdminDatasets();
+        loadAdminLogs();
+    });
+
+    document.getElementById("refresh-admin-users-btn")?.addEventListener("click", loadAdminUsers);
+    document.getElementById("refresh-admin-datasets-btn")?.addEventListener("click", loadAdminDatasets);
+    document.getElementById("refresh-admin-logs-btn")?.addEventListener("click", loadAdminLogs);
+
+    document.getElementById("tab-users")?.addEventListener("click", loadAdminUsers);
+    document.getElementById("tab-datasets")?.addEventListener("click", loadAdminDatasets);
+    document.getElementById("tab-logs")?.addEventListener("click", loadAdminLogs);
+}
+
+async function loadAdminUsers() {
+    const tbody = document.getElementById("admin-users-table-body");
+    if (!tbody) return;
+
+    try {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Loading users...</td></tr>';
+        const data = await apiRequest("/admin/users");
+        if (!data.users || data.users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No registered users found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = "";
+        data.users.forEach(u => {
+            const tr = document.createElement("tr");
+            const statusBadge = u.is_active
+                ? '<span class="badge bg-success">Active</span>'
+                : '<span class="badge bg-danger">Deactivated</span>';
+            const actionBtn = u.role === "admin"
+                ? '<span class="text-muted small">Protected</span>'
+                : `<button class="btn btn-sm ${u.is_active ? 'btn-outline-danger' : 'btn-outline-success'}" onclick="toggleUserStatus(${u.id}, ${u.is_active})">${u.is_active ? 'Deactivate' : 'Activate'}</button>`;
+
+            tr.innerHTML = `
+                <td>${u.id}</td>
+                <td class="fw-semibold">${u.username}</td>
+                <td>${u.email}</td>
+                <td><span class="badge bg-secondary text-uppercase">${u.role}</span></td>
+                <td>${statusBadge}</td>
+                <td class="text-muted small">${u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
+                <td>${actionBtn}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">Failed to load users: ${error.message}</td></tr>`;
+    }
+}
+
+async function toggleUserStatus(userId, currentStatus) {
+    if (!confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} this user account?`)) return;
+
+    try {
+        await apiRequest(`/admin/users/${userId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: !currentStatus })
+        });
+        await loadAdminUsers();
+        await loadAdminLogs();
+    } catch (error) {
+        alert(`Error updating user status: ${error.message}`);
+    }
+}
+
+async function loadAdminDatasets() {
+    const tbody = document.getElementById("admin-datasets-table-body");
+    if (!tbody) return;
+
+    try {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Loading datasets...</td></tr>';
+        const data = await apiRequest("/admin/datasets");
+        if (!data.datasets || data.datasets.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No stored datasets found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = "";
+        data.datasets.forEach(d => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${d.id}</td>
+                <td class="fw-semibold"><i class="bi bi-person me-1 text-primary"></i>${d.owner_username} (ID: ${d.user_id})</td>
+                <td>${d.filename}</td>
+                <td>${d.row_count}</td>
+                <td>${d.column_count}</td>
+                <td class="text-muted small">${d.created_at ? new Date(d.created_at).toLocaleString() : '-'}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAdminDataset(${d.id})">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">Failed to load datasets: ${error.message}</td></tr>`;
+    }
+}
+
+async function deleteAdminDataset(datasetId) {
+    if (!confirm(`Are you sure you want to delete dataset #${datasetId}? This will remove the file permanently.`)) return;
+
+    try {
+        await apiRequest(`/admin/datasets/${datasetId}`, {
+            method: "DELETE"
+        });
+        await loadAdminDatasets();
+        await loadAdminLogs();
+    } catch (error) {
+        alert(`Error deleting dataset: ${error.message}`);
+    }
+}
+
+async function loadAdminLogs() {
+    const tbody = document.getElementById("admin-logs-table-body");
+    if (!tbody) return;
+
+    try {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Loading activity logs...</td></tr>';
+        const data = await apiRequest("/admin/logs");
+        if (!data.logs || data.logs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No activity logs recorded yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = "";
+        data.logs.forEach(l => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td class="text-nowrap small text-muted">${l.timestamp ? new Date(l.timestamp).toLocaleString() : '-'}</td>
+                <td><span class="badge bg-primary">${l.action}</span></td>
+                <td>${l.username ? `${l.username} (ID: ${l.user_id})` : '<span class="text-muted">system</span>'}</td>
+                <td class="small text-break">${l.details || '-'}</td>
+                <td class="small text-muted">${l.ip_address || '-'}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3">Failed to load logs: ${error.message}</td></tr>`;
+    }
 }

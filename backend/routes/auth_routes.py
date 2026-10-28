@@ -7,14 +7,14 @@ from sqlalchemy.exc import IntegrityError
 from database.db import db
 from models.user import User
 from models.user_session import UserSession
-from routes.auth_utils import get_authenticated_user, revoke_current_session
+from routes.auth_utils import get_authenticated_user, revoke_current_session, log_activity
 
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
-    """Register a new user - GitHub Issue #4."""
+    """Register a new user - GitHub Issue #4 & FR-7.5 (default role student)."""
     data = request.get_json(silent=True)
 
     if not isinstance(data, dict):
@@ -52,10 +52,13 @@ def register():
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "Username already exists"}), 409
 
+    # FR-7.5 / FR-7.5-IT-1: Client cannot self-assign elevated roles.
     user = User(
         username=username,
         email=email,
-        password_hash=generate_password_hash(password)
+        password_hash=generate_password_hash(password),
+        role="student",
+        is_active=True
     )
 
     try:
@@ -68,9 +71,12 @@ def register():
         db.session.rollback()
         return jsonify({"error": "Registration failed"}), 500
 
+    log_activity("USER_REGISTER", user_id=user.id, details=f"Registered account: {user.username}", ip_address=request.remote_addr)
+
     return jsonify({
         "message": "Registration successful",
-        "user_id": user.id
+        "user_id": user.id,
+        "role": user.role
     }), 201
 
 
@@ -93,7 +99,12 @@ def login():
 
     user = User.query.filter_by(username=username).first()
     if user is None or not check_password_hash(user.password_hash, password):
+        log_activity("LOGIN_FAILED", details=f"Failed login attempt for username: {username}", ip_address=request.remote_addr)
         return jsonify({"error": "Invalid username or password"}), 401
+
+    if not getattr(user, "is_active", True):
+        log_activity("LOGIN_BLOCKED", user_id=user.id, details="Attempted login on deactivated account", ip_address=request.remote_addr)
+        return jsonify({"error": "Account is deactivated. Contact an administrator."}), 403
 
     # Revoke any old browser session before issuing a fresh server-tracked one.
     revoke_current_session()
@@ -115,10 +126,18 @@ def login():
     session["session_id"] = auth_session.session_id
     session["user_id"] = user.id
     session["username"] = user.username
+    session["role"] = user.role
+
+    log_activity("USER_LOGIN", user_id=user.id, details=f"User {user.username} logged in with role {user.role}", ip_address=request.remote_addr)
 
     return jsonify({
         "message": "Login successful",
-        "user": {"id": user.id, "username": user.username},
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "role": user.role,
+            "is_active": user.is_active
+        },
         "redirect_url": "/",
     }), 200
 
@@ -131,12 +150,21 @@ def current_session():
 
     return jsonify({
         "authenticated": True,
-        "user": {"id": user.id, "username": user.username},
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "role": getattr(user, "role", "student"),
+            "is_active": getattr(user, "is_active", True)
+        },
     }), 200
 
 @auth_bp.route("/logout", methods=["POST"])
 def logout():
     """Revoke the current server-side session and expire the browser cookie."""
+    current_u = get_authenticated_user()
+    if current_u:
+        log_activity("USER_LOGOUT", user_id=current_u.id, details=f"User {current_u.username} logged out", ip_address=request.remote_addr)
+
     was_active = revoke_current_session()
     if was_active:
         return jsonify({
