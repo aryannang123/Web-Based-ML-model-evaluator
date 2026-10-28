@@ -80,10 +80,56 @@
                     </div>
                 </div>
 
-                <!-- 2. Model Training Configuration -->
-                <div class="card shadow-sm border-0">
+                <!-- 2. US-14: Data Preprocessing Card -->
+                <div class="card shadow-sm border-0 mb-4" id="preprocessing-card">
                     <div class="card-header bg-white py-3 fw-semibold">
-                        <i class="bi bi-sliders me-2 text-primary"></i>2. Configure & Train Model
+                        <i class="bi bi-gear-wide-connected me-2 text-primary"></i>2. Data Preprocessing (US-14)
+                    </div>
+                    <div class="card-body">
+                        <form id="preprocess-form">
+                            <div class="mb-3">
+                                <label for="missing-values-select" class="form-label small fw-semibold">Missing Values Handling</label>
+                                <select class="form-select form-select-sm" id="missing-values-select" disabled>
+                                    <option value="none">None (Keep as-is)</option>
+                                    <option value="drop">Drop Rows with Missing Values</option>
+                                    <option value="mean">Impute with Mean (Numeric) / Mode (Categorical)</option>
+                                    <option value="median">Impute with Median (Numeric) / Mode (Categorical)</option>
+                                    <option value="mode">Impute with Mode (Most Frequent)</option>
+                                    <option value="constant">Impute with Constant (0 / 'missing')</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="encoding-select" class="form-label small fw-semibold">Categorical Feature Encoding</label>
+                                <select class="form-select form-select-sm" id="encoding-select" disabled>
+                                    <option value="none">None (Keep as-is)</option>
+                                    <option value="label">Label Encoding (Integer IDs)</option>
+                                    <option value="onehot">One-Hot Encoding (Indicator Columns)</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="scaling-select" class="form-label small fw-semibold">Feature Scaling (Numeric)</label>
+                                <select class="form-select form-select-sm" id="scaling-select" disabled>
+                                    <option value="none">None (No scaling)</option>
+                                    <option value="minmax">Min-Max Normalization ([0, 1])</option>
+                                    <option value="standard">Standardization (Z-score: mean=0, std=1)</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn btn-outline-primary w-100" id="preprocess-btn" disabled>
+                                <i class="bi bi-magic me-1"></i>Apply Preprocessing
+                            </button>
+                        </form>
+
+                        <div id="preprocess-feedback" class="mt-3 d-none alert alert-info py-2 small"></div>
+                    </div>
+                </div>
+
+                <!-- 3. Model Training Configuration -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white py-3 fw-semibold">
+                        <i class="bi bi-sliders me-2 text-primary"></i>3. Configure & Train Model
                     </div>
                     <div class="card-body">
                         <form id="train-form">

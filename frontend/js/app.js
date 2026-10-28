@@ -95,6 +95,10 @@ function setupEventListeners() {
     document.getElementById("upload-form")
         ?.addEventListener("submit", uploadDataset);
 
+    // US-14: Data Preprocessing form listener.
+    document.getElementById("preprocess-form")
+        ?.addEventListener("submit", applyPreprocessing);
+
     // TODO: US-15 - Target column dropdown listener (Abhishek).
     // TODO: US-16 - Split ratio range slider listener (Nidhi).
     // TODO: US-18 - Train button listener (Aryan).
@@ -107,6 +111,95 @@ function setupEventListeners() {
     }
 
     console.log("Frontend architecture initialized.");
+}
+
+// US-14: Update preprocessing controls based on active dataset state.
+function updatePreprocessingControls(enabled) {
+    const missingSelect = document.getElementById("missing-values-select");
+    const encodingSelect = document.getElementById("encoding-select");
+    const scalingSelect = document.getElementById("scaling-select");
+    const preprocessBtn = document.getElementById("preprocess-btn");
+
+    if (missingSelect) missingSelect.disabled = !enabled;
+    if (encodingSelect) encodingSelect.disabled = !enabled;
+    if (scalingSelect) scalingSelect.disabled = !enabled;
+    if (preprocessBtn) preprocessBtn.disabled = !enabled;
+}
+
+// US-14: Show user feedback for preprocessing operations.
+function showPreprocessFeedback(message, isSuccess = true) {
+    const feedback = document.getElementById("preprocess-feedback");
+    if (!feedback) return;
+
+    feedback.classList.remove("d-none", "alert-success", "alert-danger", "alert-info");
+    feedback.classList.add(isSuccess ? "alert-success" : "alert-danger");
+    feedback.textContent = message;
+}
+
+// US-14: Apply dataset preprocessing operations.
+async function applyPreprocessing(event) {
+    event.preventDefault();
+
+    if (!activeDatasetId) {
+        showPreprocessFeedback("Upload a dataset before applying preprocessing.", false);
+        return;
+    }
+
+    const button = document.getElementById("preprocess-btn");
+    const missingStrategy = document.getElementById("missing-values-select")?.value || "none";
+    const encodingStrategy = document.getElementById("encoding-select")?.value || "none";
+    const scalingStrategy = document.getElementById("scaling-select")?.value || "none";
+    const targetColumn = document.getElementById("target-column-select")?.value || null;
+
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Applying Preprocessing…';
+    }
+
+    showPreprocessFeedback("Executing preprocessing transformations on dataset…", true);
+    const feedback = document.getElementById("preprocess-feedback");
+    if (feedback) {
+        feedback.classList.remove("alert-success", "alert-danger");
+        feedback.classList.add("alert-info");
+    }
+
+    try {
+        const payload = {
+            missing_values: missingStrategy,
+            encoding: encodingStrategy,
+            scaling: scalingStrategy,
+            target_column: targetColumn,
+            save: true
+        };
+
+        const result = await apiRequest(`/dataset/${encodeURIComponent(activeDatasetId)}/preprocess`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        updateDatasetDisplay(result);
+        showPreprocessFeedback(
+            `Preprocessing complete: ${result.row_count} rows and ${result.column_count} columns available.`,
+            true
+        );
+
+        await loadDatasetPreview(result.dataset_id);
+        await loadDatasetStatistics(result.dataset_id);
+
+    } catch (error) {
+        showPreprocessFeedback(
+            error.message || "Preprocessing configuration could not be applied.",
+            false
+        );
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-magic me-1"></i>Apply Preprocessing';
+        }
+    }
 }
 
 // Update the upload button based on active dataset state.
@@ -159,6 +252,8 @@ function updateDatasetDisplay(dataset) {
     if (Array.isArray(dataset.columns)) {
         updateTargetColumnOptions(dataset.columns);
     }
+
+    updatePreprocessingControls(true);
 }
 
 // US-08 / US-11: Upload a new dataset or replace the active dataset.
@@ -422,6 +517,7 @@ async function restoreActiveDataset() {
         }
 
         updateTargetColumnOptions([]);
+        updatePreprocessingControls(false);
     }
 
     updateUploadButton();

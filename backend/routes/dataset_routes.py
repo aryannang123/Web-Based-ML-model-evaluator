@@ -9,6 +9,7 @@ import pandas as pd
 from flask import Blueprint, current_app, g, jsonify, request
 
 from database.db import db
+from ml.preprocessor import DataPreprocessor
 from models.dataset import Dataset
 from routes.auth_utils import (
     get_owned_dataset,
@@ -571,4 +572,168 @@ def dataset_statistics(dataset_id):
         "row_count": int(len(frame.index)),
         "column_count": int(len(frame.columns)),
         "columns": columns,
+    }), 200
+
+
+@dataset_bp.route("/<int:dataset_id>/preprocess", methods=["POST"])
+@login_required
+def preprocess_dataset(dataset_id):
+    """Apply data preprocessing operations to an owned dataset (US-14 / FR-3.1)."""
+    dataset = get_owned_dataset(dataset_id, g.current_user.id)
+    if dataset is None:
+        return jsonify({"error": "Dataset not found"}), 404
+
+    upload_folder = os.path.realpath(current_app.config["UPLOAD_FOLDER"])
+    stored_path = os.path.realpath(dataset.file_path)
+
+    try:
+        inside_upload_folder = (
+            os.path.commonpath([upload_folder, stored_path]) == upload_folder
+        )
+    except ValueError:
+        inside_upload_folder = False
+
+    if not inside_upload_folder or not os.path.isfile(stored_path):
+        return jsonify({"error": "The dataset file is missing or unavailable."}), 404
+
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Invalid JSON request body."}), 400
+
+    missing_strategy = str(payload.get("missing_values", "none")).lower()
+    encoding_strategy = str(payload.get("encoding", "none")).lower()
+    scaling_strategy = str(payload.get("scaling", "none")).lower()
+    target_column = payload.get("target_column")
+    if target_column:
+        target_column = str(target_column).strip()
+    else:
+        target_column = None
+    fill_value = payload.get("fill_value")
+    save_changes = payload.get("save", True)
+
+    # Validate option identifiers (SEC-INP-1)
+    if missing_strategy not in DataPreprocessor.SUPPORTED_MISSING_STRATEGIES:
+        return jsonify({
+            "error": (
+                f"Invalid missing value option '{missing_strategy}'. "
+                f"Supported: {', '.join(DataPreprocessor.SUPPORTED_MISSING_STRATEGIES)}"
+            )
+        }), 400
+
+    if encoding_strategy not in DataPreprocessor.SUPPORTED_ENCODING_STRATEGIES:
+        return jsonify({
+            "error": (
+                f"Invalid encoding option '{encoding_strategy}'. "
+                f"Supported: {', '.join(DataPreprocessor.SUPPORTED_ENCODING_STRATEGIES)}"
+            )
+        }), 400
+
+    if scaling_strategy not in DataPreprocessor.SUPPORTED_SCALING_STRATEGIES:
+        return jsonify({
+            "error": (
+                f"Invalid scaling option '{scaling_strategy}'. "
+                f"Supported: {', '.join(DataPreprocessor.SUPPORTED_SCALING_STRATEGIES)}"
+            )
+        }), 400
+
+    try:
+        frame = pd.read_csv(stored_path)
+    except Exception as exc:
+        current_app.logger.exception(
+            "Failed reading dataset %s for preprocessing: %s", dataset_id, exc
+        )
+        return jsonify({"error": "The dataset file could not be read."}), 500
+
+    if target_column and target_column not in frame.columns:
+        return jsonify({
+            "error": f"Target column '{target_column}' does not exist in dataset."
+        }), 400
+
+    try:
+        config = {
+            "missing_values": missing_strategy,
+            "encoding": encoding_strategy,
+            "scaling": scaling_strategy,
+            "fill_value": fill_value,
+        }
+        processed_df, summary = DataPreprocessor.preprocess(
+            frame, config, target_column=target_column
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        current_app.logger.exception(
+            "Unexpected error preprocessing dataset %s: %s", dataset_id, exc
+        )
+        return jsonify({
+            "error": "Preprocessing failed due to an unexpected error."
+        }), 500
+
+    if save_changes:
+        temp_path = f"{stored_path}.tmp"
+        try:
+            processed_df.to_csv(temp_path, index=False, encoding="utf-8")
+            os.replace(temp_path, stored_path)
+
+            existing_meta = dataset.metadata_json or {}
+            existing_meta["columns"] = [str(c) for c in processed_df.columns]
+            existing_meta["preprocessed"] = True
+            existing_meta["last_preprocessing"] = summary
+
+            dataset.row_count = int(len(processed_df.index))
+            dataset.column_count = int(len(processed_df.columns))
+            dataset.file_size = int(os.path.getsize(stored_path))
+            dataset.metadata_json = existing_meta
+
+            db.session.commit()
+
+            log_activity(
+                "DATASET_PREPROCESS",
+                user_id=g.current_user.id,
+                details=(
+                    f"Preprocessed dataset #{dataset.id} ({dataset.filename}): "
+                    f"{len(processed_df.index)} rows, {len(processed_df.columns)} cols "
+                    f"(missing={missing_strategy}, encoding={encoding_strategy}, scaling={scaling_strategy})"
+                ),
+                ip_address=request.remote_addr,
+            )
+        except Exception as exc:
+            db.session.rollback()
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+            current_app.logger.exception(
+                "Failed saving preprocessed dataset %s: %s", dataset_id, exc
+            )
+            return jsonify({
+                "error": "Failed to save preprocessed dataset."
+            }), 500
+
+    def json_value(val):
+        if pd.isna(val):
+            return None
+        if hasattr(val, "item"):
+            val = val.item()
+        if isinstance(val, float) and not math.isfinite(val):
+            return None
+        if isinstance(val, (str, int, float, bool)) or val is None:
+            return val
+        return str(val)
+
+    sample_rows = [
+        {str(col): json_value(val) for col, val in row.items()}
+        for row in processed_df.head(10).to_dict(orient="records")
+    ]
+
+    return jsonify({
+        "message": "Dataset preprocessed successfully.",
+        "dataset_id": dataset.id,
+        "filename": dataset.filename,
+        "row_count": int(len(processed_df.index)),
+        "column_count": int(len(processed_df.columns)),
+        "columns": [str(c) for c in processed_df.columns],
+        "preview": sample_rows,
+        "preprocessing_summary": summary,
     }), 200
