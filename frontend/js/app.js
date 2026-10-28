@@ -220,6 +220,7 @@ async function uploadDataset(event) {
         );
 
         await loadDatasetPreview(result.dataset_id);
+        await loadDatasetStatistics(result.dataset_id);
 
         form.reset();
 
@@ -297,6 +298,72 @@ async function loadDatasetPreview(datasetId) {
     }
 }
 
+// US-13: Load and display dataset statistics.
+async function loadDatasetStatistics(datasetId) {
+    const status = document.getElementById("statistics-status");
+    const summary = document.getElementById("statistics-summary");
+    const rowCount = document.getElementById("statistics-row-count");
+    const columnCount = document.getElementById("statistics-column-count");
+    const table = document.getElementById("statistics-table");
+    const tableBody = document.getElementById("statistics-table-body");
+
+    if (!status || !summary || !rowCount || !columnCount || !table || !tableBody) {
+        return;
+    }
+
+    status.className = "text-muted small";
+    status.textContent = "Loading dataset statistics...";
+    summary.classList.add("d-none");
+    table.classList.add("d-none");
+    tableBody.replaceChildren();
+
+    try {
+        const data = await apiRequest(
+            `/dataset/${encodeURIComponent(datasetId)}/statistics`
+        );
+
+        rowCount.textContent = data.row_count;
+        columnCount.textContent = data.column_count;
+
+        for (const column of data.columns) {
+            const row = document.createElement("tr");
+
+            const values = [
+                column.name,
+                column.type,
+                column.missing_values,
+                column.statistics?.mean,
+                column.statistics?.median,
+                column.statistics?.min,
+                column.statistics?.max
+            ];
+
+            for (const value of values) {
+                const cell = document.createElement("td");
+
+                cell.textContent =
+                    value === null || value === undefined
+                        ? "—"
+                        : typeof value === "number"
+                            ? Number(value.toFixed(2)).toString()
+                            : String(value);
+
+                row.appendChild(cell);
+            }
+
+            tableBody.appendChild(row);
+        }
+
+        summary.classList.remove("d-none");
+        table.classList.remove("d-none");
+        status.textContent = `Statistics for ${data.filename}`;
+    } catch (error) {
+        status.className = "text-danger small";
+        status.textContent =
+            error.message || "Could not load dataset statistics.";
+    }
+}
+
 // Display upload or replacement feedback.
 function showUploadFeedback(message, success) {
     const feedback = document.getElementById("upload-feedback");
@@ -339,6 +406,7 @@ async function restoreActiveDataset() {
         });
 
         await loadDatasetPreview(dataset.id);
+        await loadDatasetStatistics(dataset.id);
 
     } catch (error) {
         // Clear stale IDs, including IDs belonging to another account.

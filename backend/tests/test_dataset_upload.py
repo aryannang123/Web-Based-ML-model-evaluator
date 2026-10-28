@@ -1,3 +1,4 @@
+
 import io
 import os
 import tempfile
@@ -16,7 +17,9 @@ from werkzeug.security import generate_password_hash
 class TestDatasetUpload(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temp_dir = tempfile.TemporaryDirectory(prefix="ml-evaluator-upload-tests-")
+        cls.temp_dir = tempfile.TemporaryDirectory(
+            prefix="ml-evaluator-upload-tests-"
+        )
 
         class TestConfig:
             TESTING = True
@@ -56,6 +59,7 @@ class TestDatasetUpload(unittest.TestCase):
         db.session.query(Dataset).delete()
         db.session.query(User).delete()
         db.session.commit()
+
         for name in os.listdir(self.app.config["UPLOAD_FOLDER"]):
             os.remove(os.path.join(self.app.config["UPLOAD_FOLDER"], name))
 
@@ -63,19 +67,29 @@ class TestDatasetUpload(unittest.TestCase):
         if user_id is None:
             response = self.client.post(
                 "/api/auth/login",
-                json={"username": self.user.username, "password": "test-password-123"},
+                json={
+                    "username": self.user.username,
+                    "password": "test-password-123",
+                },
             )
             self.assertEqual(response.status_code, 200)
             return
+
         with self.client.session_transaction() as test_session:
             test_session["user_id"] = user_id
             test_session["session_id"] = "unknown-session-id"
 
     def upload(self, contents, filename="data.csv", extra_fields=None):
         data = {"file": (io.BytesIO(contents), filename)}
+
         if extra_fields:
             data.update(extra_fields)
-        return self.client.post("/api/dataset/upload", data=data, content_type="multipart/form-data")
+
+        return self.client.post(
+            "/api/dataset/upload",
+            data=data,
+            content_type="multipart/form-data",
+        )
 
     def test_valid_upload_persists_metadata_and_uses_unique_server_path(self):
         self.authenticate()
@@ -88,6 +102,7 @@ class TestDatasetUpload(unittest.TestCase):
         self.assertEqual(response.json["row_count"], 3)
         self.assertEqual(response.json["column_count"], 2)
         self.assertEqual(response.json["columns"], ["name", "score"])
+
         dataset = db.session.get(Dataset, response.json["dataset_id"])
         self.assertIsNotNone(dataset)
         self.assertEqual(dataset.user_id, self.user.id)
@@ -96,14 +111,21 @@ class TestDatasetUpload(unittest.TestCase):
         self.assertEqual(dataset.row_count, 3)
         self.assertEqual(dataset.column_count, 2)
         self.assertEqual(dataset.metadata_json, {"columns": ["name", "score"]})
-        self.assertEqual(os.path.dirname(dataset.file_path), os.path.abspath(self.app.config["UPLOAD_FOLDER"]))
+        self.assertEqual(
+            os.path.dirname(dataset.file_path),
+            os.path.abspath(self.app.config["UPLOAD_FOLDER"]),
+        )
         self.assertTrue(os.path.isfile(dataset.file_path))
+
         with open(dataset.file_path, "rb") as saved:
             self.assertEqual(saved.read(), contents)
 
         second = self.upload(contents, "students.csv")
         self.assertEqual(second.status_code, 201)
-        self.assertNotEqual(dataset.file_path, db.session.get(Dataset, second.json["dataset_id"]).file_path)
+        self.assertNotEqual(
+            dataset.file_path,
+            db.session.get(Dataset, second.json["dataset_id"]).file_path,
+        )
 
     def test_csv_meeting_the_two_row_two_column_minimum_is_accepted(self):
         self.authenticate()
@@ -116,6 +138,7 @@ class TestDatasetUpload(unittest.TestCase):
 
     def test_upload_requires_a_verified_session_user(self):
         response = self.upload(b"a\n1\n")
+
         self.assertEqual(response.status_code, 401)
         self.assertEqual(Dataset.query.count(), 0)
 
@@ -140,24 +163,29 @@ class TestDatasetUpload(unittest.TestCase):
 
     def test_unknown_session_user_is_rejected(self):
         self.authenticate(user_id=self.user.id + 1000)
+
         response = self.upload(b"a\n1\n")
+
         self.assertEqual(response.status_code, 401)
 
     def test_missing_file_is_rejected(self):
         self.authenticate()
         response = self.client.post("/api/dataset/upload", data={})
+
         self.assertEqual(response.status_code, 400)
         self.assertIn("Choose a CSV", response.json["error"])
 
     def test_non_csv_extension_is_rejected(self):
         self.authenticate()
         response = self.upload(b"a\n1\n", "data.txt")
+
         self.assertEqual(response.status_code, 400)
         self.assertIn("Unsupported file type", response.json["error"])
 
     def test_empty_file_is_rejected(self):
         self.authenticate()
         response = self.upload(b"")
+
         self.assertEqual(response.status_code, 400)
         self.assertIn("empty", response.json["error"].lower())
 
@@ -183,7 +211,11 @@ class TestDatasetUpload(unittest.TestCase):
             with self.subTest(contents=contents):
                 response = self.upload(contents)
                 self.assertEqual(response.status_code, 400)
-                self.assertIn(expected_message.lower(), response.json["error"].lower())
+                self.assertIn(
+                    expected_message.lower(),
+                    response.json["error"].lower(),
+                )
+
         self.assertEqual(Dataset.query.count(), 0)
         self.assertEqual(os.listdir(self.app.config["UPLOAD_FOLDER"]), [])
 
@@ -191,18 +223,27 @@ class TestDatasetUpload(unittest.TestCase):
         self.authenticate()
         original_limit = self.app.config["MAX_CONTENT_LENGTH"]
         self.app.config["MAX_CONTENT_LENGTH"] = 128
+
         try:
             response = self.upload(b"a\n" + b"x" * 256 + b"\n")
         finally:
             self.app.config["MAX_CONTENT_LENGTH"] = original_limit
+
         self.assertEqual(response.status_code, 413)
-        self.assertIn("128 bytes request-size limit", response.json["error"].lower())
+        self.assertIn(
+            "128 bytes request-size limit",
+            response.json["error"].lower(),
+        )
         self.assertEqual(Dataset.query.count(), 0)
         self.assertEqual(os.listdir(self.app.config["UPLOAD_FOLDER"]), [])
 
     def test_database_failure_rolls_back_and_removes_uploaded_file(self):
         self.authenticate()
-        with patch("routes.dataset_routes._persist_dataset", side_effect=SQLAlchemyError("test failure")):
+
+        with patch(
+            "routes.dataset_routes._persist_dataset",
+            side_effect=SQLAlchemyError("test failure"),
+        ):
             response = self.upload(b"feature,target\n1,yes\n2,no\n")
 
         self.assertEqual(response.status_code, 500)
@@ -213,18 +254,23 @@ class TestDatasetUpload(unittest.TestCase):
     def test_authenticated_preview_returns_headers_values_types_and_full_dimensions(self):
         self.authenticate()
         contents = "name,score,ratio\n" + "".join(
-            f"student-{index},{index},{index + 0.5}\n" for index in range(13)
+            f"student-{index},{index},{index + 0.5}\n"
+            for index in range(13)
         )
+
         uploaded = self.upload(contents.encode("utf-8"))
         self.assertEqual(uploaded.status_code, 201)
 
-        response = self.client.get(f"/api/dataset/{uploaded.json['dataset_id']}/preview")
+        response = self.client.get(
+            f"/api/dataset/{uploaded.json['dataset_id']}/preview"
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["columns"], ["name", "score", "ratio"])
-        self.assertEqual(response.json["rows"][0], {
-            "name": "student-0", "score": 0, "ratio": 0.5
-        })
+        self.assertEqual(
+            response.json["rows"][0],
+            {"name": "student-0", "score": 0, "ratio": 0.5},
+        )
         self.assertIn(response.json["data_types"]["name"], {"object", "str"})
         self.assertEqual(response.json["data_types"]["score"], "int64")
         self.assertEqual(response.json["data_types"]["ratio"], "float64")
@@ -239,11 +285,60 @@ class TestDatasetUpload(unittest.TestCase):
         uploaded = self.upload(b"feature,target\n1,\n,yes\n3,no\n")
         self.assertEqual(uploaded.status_code, 201)
 
-        response = self.client.get(f"/api/dataset/{uploaded.json['dataset_id']}/preview")
+        response = self.client.get(
+            f"/api/dataset/{uploaded.json['dataset_id']}/preview"
+        )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json["rows"][0], {"feature": 1, "target": None})
-        self.assertEqual(response.json["rows"][1], {"feature": None, "target": "yes"})
+        self.assertEqual(
+            response.json["rows"][0],
+            {"feature": 1, "target": None},
+        )
+        self.assertEqual(
+            response.json["rows"][1],
+            {"feature": None, "target": "yes"},
+        )
+
+    # US-13: Dataset statistics endpoint tests.
+    def test_statistics_returns_numeric_summary_and_missing_counts(self):
+        self.authenticate()
+        contents = (
+            b"hours,score,category\n"
+            b"2,60,A\n"
+            b"4,,B\n"
+            b"6,90,A\n"
+        )
+
+        uploaded = self.upload(contents)
+        self.assertEqual(uploaded.status_code, 201)
+
+        response = self.client.get(
+            f"/api/dataset/{uploaded.json['dataset_id']}/statistics"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json
+
+        self.assertEqual(result["row_count"], 3)
+        self.assertEqual(result["column_count"], 3)
+
+        columns = {
+            column["name"]: column
+            for column in result["columns"]
+        }
+
+        self.assertEqual(columns["hours"]["type"], "numeric")
+        self.assertEqual(columns["hours"]["missing_values"], 0)
+        self.assertEqual(columns["hours"]["statistics"]["mean"], 4.0)
+        self.assertEqual(columns["hours"]["statistics"]["median"], 4.0)
+        self.assertEqual(columns["hours"]["statistics"]["min"], 2)
+        self.assertEqual(columns["hours"]["statistics"]["max"], 6)
+
+        self.assertEqual(columns["score"]["missing_values"], 1)
+        self.assertEqual(columns["score"]["statistics"]["mean"], 75.0)
+
+        self.assertEqual(columns["category"]["type"], "categorical")
+        self.assertIsNone(columns["category"]["statistics"])
 
     def test_preview_requires_authentication(self):
         response = self.client.get("/api/dataset/1/preview")
@@ -258,10 +353,16 @@ class TestDatasetUpload(unittest.TestCase):
         )
         db.session.add(other_user)
         db.session.flush()
-        path = os.path.join(self.app.config["UPLOAD_FOLDER"], "other-user.csv")
+
+        path = os.path.join(
+            self.app.config["UPLOAD_FOLDER"],
+            "other-user.csv",
+        )
         os.makedirs(self.app.config["UPLOAD_FOLDER"], exist_ok=True)
+
         with open(path, "w", encoding="utf-8") as saved:
             saved.write("secret,value\nprivate,1\n")
+
         dataset = Dataset(
             user_id=other_user.id,
             filename="secret.csv",
@@ -273,7 +374,9 @@ class TestDatasetUpload(unittest.TestCase):
         db.session.add(dataset)
         db.session.commit()
 
-        response = self.client.get(f"/api/dataset/{dataset.id}/preview")
+        response = self.client.get(
+            f"/api/dataset/{dataset.id}/preview"
+        )
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json["error"], "Dataset not found")
@@ -282,6 +385,7 @@ class TestDatasetUpload(unittest.TestCase):
     def test_preview_nonexistent_dataset_returns_404(self):
         self.authenticate()
         response = self.client.get("/api/dataset/999999/preview")
+
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json["error"], "Dataset not found")
 
@@ -291,7 +395,9 @@ class TestDatasetUpload(unittest.TestCase):
         dataset = db.session.get(Dataset, uploaded.json["dataset_id"])
         os.remove(dataset.file_path)
 
-        response = self.client.get(f"/api/dataset/{dataset.id}/preview")
+        response = self.client.get(
+            f"/api/dataset/{dataset.id}/preview"
+        )
 
         self.assertEqual(response.status_code, 404)
         self.assertIn("file is missing", response.json["error"].lower())
@@ -300,21 +406,33 @@ class TestDatasetUpload(unittest.TestCase):
     def test_preview_unreadable_file_returns_clear_500(self):
         self.authenticate()
         uploaded = self.upload(b"feature,target\n1,yes\n2,no\n")
-        with patch("routes.dataset_routes.pd.read_csv", side_effect=PermissionError("private path")):
-            response = self.client.get(f"/api/dataset/{uploaded.json['dataset_id']}/preview")
+
+        with patch(
+            "routes.dataset_routes.pd.read_csv",
+            side_effect=PermissionError("private path"),
+        ):
+            response = self.client.get(
+                f"/api/dataset/{uploaded.json['dataset_id']}/preview"
+            )
 
         self.assertEqual(response.status_code, 500)
-        self.assertEqual(response.json["error"], "The dataset file could not be read.")
+        self.assertEqual(
+            response.json["error"],
+            "The dataset file could not be read.",
+        )
         self.assertNotIn("private path", response.get_data(as_text=True))
 
     def test_preview_malformed_csv_returns_clear_400(self):
         self.authenticate()
         uploaded = self.upload(b"feature,target\n1,yes\n2,no\n")
         dataset = db.session.get(Dataset, uploaded.json["dataset_id"])
+
         with open(dataset.file_path, "wb") as saved:
             saved.write(b'feature,target\n"unterminated,yes\n')
 
-        response = self.client.get(f"/api/dataset/{dataset.id}/preview")
+        response = self.client.get(
+            f"/api/dataset/{dataset.id}/preview"
+        )
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("malformed", response.json["error"].lower())

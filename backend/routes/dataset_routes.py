@@ -458,14 +458,104 @@ def preview_dataset(dataset_id):
         "sample_size": len(rows),
     }), 200
 
+
 @dataset_bp.route("/<int:dataset_id>/statistics", methods=["GET"])
 @login_required
 def dataset_statistics(dataset_id):
-    """Dataset statistics endpoint reserved for US-13."""
-    if get_owned_dataset(dataset_id, g.current_user.id) is None:
+    """Return descriptive statistics for an owned dataset."""
+    dataset = get_owned_dataset(dataset_id, g.current_user.id)
+
+    if dataset is None:
         return jsonify({"error": "Dataset not found"}), 404
 
-    # TODO: US-13: Display dataset statistics.
+    # Validate the stored path before reading the dataset file.
+    upload_folder = os.path.realpath(
+        current_app.config["UPLOAD_FOLDER"]
+    )
+    stored_path = os.path.realpath(dataset.file_path)
+
+    try:
+        inside_upload_folder = (
+            os.path.commonpath([upload_folder, stored_path])
+            == upload_folder
+        )
+    except ValueError:
+        inside_upload_folder = False
+
+    if not inside_upload_folder or not os.path.isfile(stored_path):
+        return jsonify({
+            "error": "The dataset file is missing or unavailable."
+        }), 404
+
+    try:
+        frame = pd.read_csv(stored_path)
+    except (OSError, PermissionError):
+        current_app.logger.exception(
+            "Unable to read dataset %s for statistics", dataset_id
+        )
+        return jsonify({
+            "error": "The dataset file could not be read."
+        }), 500
+    except (
+        pd.errors.EmptyDataError,
+        pd.errors.ParserError,
+        UnicodeDecodeError,
+        ValueError,
+    ):
+        current_app.logger.exception(
+            "Unable to parse dataset %s for statistics", dataset_id
+        )
+        return jsonify({
+            "error": "The dataset CSV is malformed or unreadable."
+        }), 400
+
+    def json_number(value):
+        """Convert numeric results to JSON-safe values."""
+        if pd.isna(value):
+            return None
+
+        number = float(value)
+
+        if not math.isfinite(number):
+            return None
+
+        return number
+
+    columns = []
+
+    for column_name in frame.columns:
+        series = frame[column_name]
+        missing_count = int(series.isna().sum())
+
+        if pd.api.types.is_numeric_dtype(series):
+            column_type = "numeric"
+            values = series.dropna()
+
+            statistics = {
+                "mean": json_number(values.mean())
+                if not values.empty else None,
+                "median": json_number(values.median())
+                if not values.empty else None,
+                "min": json_number(values.min())
+                if not values.empty else None,
+                "max": json_number(values.max())
+                if not values.empty else None,
+            }
+        else:
+            column_type = "categorical"
+            statistics = None
+
+        columns.append({
+            "name": str(column_name),
+            "type": column_type,
+            "missing_values": missing_count,
+            "statistics": statistics,
+        })
+
     return jsonify({
-        "message": "Dataset statistics endpoint ready for US-13 implementation"
-    }), 501
+        "dataset_id": dataset.id,
+        "filename": dataset.filename,
+        "row_count": int(len(frame.index)),
+        "column_count": int(len(frame.columns)),
+        "columns": columns,
+    }), 200
