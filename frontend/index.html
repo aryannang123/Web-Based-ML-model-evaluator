@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="/css/style.css">
 </head>
+
 <body class="bg-light">
 
     <!-- Navbar -->
@@ -40,7 +42,8 @@
                             <i class="bi bi-lightning-charge me-2"></i>Automated ML Pipeline & Model Evaluator
                         </h4>
                         <p class="text-muted mb-0">
-                            Upload a tabular CSV dataset, configure target features, select machine learning algorithms, and compare model evaluations in real-time.
+                            Upload a tabular CSV dataset, configure target features, select machine learning algorithms,
+                            and compare model evaluations in real-time.
                         </p>
                     </div>
                 </div>
@@ -59,8 +62,10 @@
                         <form id="upload-form">
                             <div class="mb-3">
                                 <label for="csv-file" class="form-label small fw-semibold">Choose CSV File</label>
-                                <input class="form-control" type="file" id="csv-file" name="file" accept=".csv" required>
-                                <div class="form-text">CSV with a header, at least 2 rows and 2 columns (16 MiB request limit).</div>
+                                <input class="form-control" type="file" id="csv-file" name="file" accept=".csv"
+                                    required>
+                                <div class="form-text">CSV with a header, at least 2 rows and 2 columns (16 MiB request
+                                    limit).</div>
                             </div>
                             <button type="submit" class="btn btn-primary w-100" id="upload-btn">
                                 <i class="bi bi-upload me-1"></i>Upload & Inspect
@@ -109,7 +114,8 @@
                                     <span>Train-Test Split</span>
                                     <span id="split-display" class="text-primary fw-bold">80% Train / 20% Test</span>
                                 </label>
-                                <input type="range" class="form-range" id="split-range" min="0.1" max="0.5" step="0.05" value="0.2">
+                                <input type="range" class="form-range" id="split-range" min="0.1" max="0.5" step="0.05"
+                                    value="0.2">
                             </div>
 
                             <button type="submit" class="btn btn-success w-100" id="train-btn" disabled>
@@ -144,10 +150,57 @@
                     </div>
                 </div>
 
+                <!-- US-13: Dataset Statistics Card -->
+                <div class="card shadow-sm border-0 mb-4" id="statistics-card">
+                    <div class="card-header bg-white py-3 fw-semibold">
+                        <i class="bi bi-bar-chart-line me-2 text-primary"></i>
+                        Dataset Statistics
+                    </div>
+
+                    <div class="card-body">
+                        <div id="statistics-status" class="text-muted small" role="status" aria-live="polite">
+                            Upload a dataset to view its statistics.
+                        </div>
+
+                        <div id="statistics-summary" class="row g-3 mb-3 d-none">
+                            <div class="col-6">
+                                <div class="border rounded p-3">
+                                    <div class="text-muted small">Total Rows</div>
+                                    <div id="statistics-row-count" class="fs-4 fw-bold">—</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded p-3">
+                                    <div class="text-muted small">Total Columns</div>
+                                    <div id="statistics-column-count" class="fs-4 fw-bold">—</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table id="statistics-table" class="table table-hover table-striped table-sm small d-none">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Column</th>
+                                        <th>Type</th>
+                                        <th>Missing</th>
+                                        <th>Mean</th>
+                                        <th>Median</th>
+                                        <th>Min</th>
+                                        <th>Max</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="statistics-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Evaluation Metrics Results Card -->
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-white py-3 fw-semibold">
-                        <i class="bi bi-graph-up-arrow me-2 text-primary"></i>3. Evaluation Results & Performance Metrics
+                        <i class="bi bi-graph-up-arrow me-2 text-primary"></i>3. Evaluation Results & Performance
+                        Metrics
                     </div>
                     <div class="card-body" id="evaluation-container">
                         <div class="text-center text-muted py-4">
@@ -164,4 +217,5 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/js/app.js"></script>
 </body>
+
 </html>
