@@ -6,7 +6,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from config import Config
 from database.db import init_db
 from routes.auth_utils import get_authenticated_user
-from routes import auth_bp, dataset_bp, ml_bp
+from routes import auth_bp, dataset_bp, ml_bp, admin_bp
 
 
 def create_app(config_class=Config):
@@ -34,6 +34,7 @@ def create_app(config_class=Config):
     app.register_blueprint(auth_bp)
     app.register_blueprint(dataset_bp)
     app.register_blueprint(ml_bp)
+    app.register_blueprint(admin_bp)
 
     def has_authenticated_user():
         return get_authenticated_user() is not None

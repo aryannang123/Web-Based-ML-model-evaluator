@@ -14,6 +14,7 @@ from routes.auth_utils import (
     get_owned_dataset,
     login_required,
     owned_dataset_query,
+    log_activity,
 )
 
 
@@ -290,6 +291,12 @@ def upload_dataset():
         )
 
         _persist_dataset(dataset)
+        log_activity(
+            "DATASET_UPLOAD",
+            user_id=g.current_user.id,
+            details=f"Uploaded dataset {filename} ({len(frame.index)} rows, {len(columns)} cols)",
+            ip_address=request.remote_addr
+        )
 
     except Exception:
         db.session.rollback()
@@ -347,6 +354,12 @@ def replace_dataset(dataset_id):
         dataset.metadata_json = {"columns": columns}
 
         db.session.commit()
+        log_activity(
+            "DATASET_REPLACE",
+            user_id=g.current_user.id,
+            details=f"Replaced dataset #{dataset.id} with {filename} ({len(frame.index)} rows, {len(columns)} cols)",
+            ip_address=request.remote_addr
+        )
 
     except Exception:
         db.session.rollback()
