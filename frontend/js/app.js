@@ -99,7 +99,42 @@ function setupEventListeners() {
     document.getElementById("preprocess-form")
         ?.addEventListener("submit", applyPreprocessing);
 
-    // TODO: US-15 - Target column dropdown listener (Abhishek).
+    // US-15: Validate and track the selected target column.
+    const targetSelect = document.getElementById("target-column-select");
+    const targetFeedback = document.getElementById("target-column-feedback");
+    const trainButton = document.getElementById("train-btn");
+
+    if (targetSelect) {
+        targetSelect.addEventListener("change", () => {
+            const selectedTarget = targetSelect.value;
+
+            const availableColumns = Array.from(targetSelect.options)
+                .map((option) => option.value)
+                .filter(Boolean);
+
+            const isValidTarget =
+                Boolean(activeDatasetId) &&
+                availableColumns.includes(selectedTarget);
+
+            targetSelect.setCustomValidity(
+                isValidTarget ? "" : "Please select a valid target column."
+            );
+
+            if (targetFeedback) {
+                targetFeedback.textContent = isValidTarget
+                    ? `"${selectedTarget}" selected as the prediction target.`
+                    : "Please select a valid target column.";
+
+                targetFeedback.classList.toggle("text-success", isValidTarget);
+                targetFeedback.classList.toggle("text-danger", !isValidTarget);
+            }
+
+            // Enable the button only when the target is valid.
+            if (trainButton) {
+                trainButton.disabled = !isValidTarget;
+            }
+        });
+    }
     // TODO: US-16 - Split ratio range slider listener (Nidhi).
     // TODO: US-18 - Train button listener (Aryan).
     // TODO: US-19 - Render evaluation metrics and confusion matrix (Abhishek).
