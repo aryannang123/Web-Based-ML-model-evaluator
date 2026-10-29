@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="/css/style.css">
 </head>
+
 <body class="bg-light">
 
     <!-- Navbar -->
@@ -22,7 +24,11 @@
                 <span id="api-status" class="badge bg-success me-3">
                     <i class="bi bi-circle-fill me-1 small"></i>API Connected
                 </span>
-                <span id="current-user" class="text-white small me-3"></span>
+                <span id="current-user" class="text-white small me-2"></span>
+                <span id="user-role-badge" class="badge bg-light text-primary text-uppercase small me-3 d-none"></span>
+                <button id="admin-panel-btn" class="btn btn-warning btn-sm me-2 d-none" data-bs-toggle="modal" data-bs-target="#adminModal">
+                    <i class="bi bi-shield-lock me-1"></i>Admin Panel
+                </button>
                 <button id="logout-btn" class="btn btn-outline-light btn-sm d-none">Logout</button>
             </div>
         </div>
@@ -40,7 +46,8 @@
                             <i class="bi bi-lightning-charge me-2"></i>Automated ML Pipeline & Model Evaluator
                         </h4>
                         <p class="text-muted mb-0">
-                            Upload a tabular CSV dataset, configure target features, select machine learning algorithms, and compare model evaluations in real-time.
+                            Upload a tabular CSV dataset, configure target features, select machine learning algorithms,
+                            and compare model evaluations in real-time.
                         </p>
                     </div>
                 </div>
@@ -59,8 +66,10 @@
                         <form id="upload-form">
                             <div class="mb-3">
                                 <label for="csv-file" class="form-label small fw-semibold">Choose CSV File</label>
-                                <input class="form-control" type="file" id="csv-file" name="file" accept=".csv" required>
-                                <div class="form-text">CSV with a header, at least 2 rows and 2 columns (16 MiB request limit).</div>
+                                <input class="form-control" type="file" id="csv-file" name="file" accept=".csv"
+                                    required>
+                                <div class="form-text">CSV with a header, at least 2 rows and 2 columns (16 MiB request
+                                    limit).</div>
                             </div>
                             <button type="submit" class="btn btn-primary w-100" id="upload-btn">
                                 <i class="bi bi-upload me-1"></i>Upload & Inspect
@@ -71,10 +80,56 @@
                     </div>
                 </div>
 
-                <!-- 2. Model Training Configuration -->
-                <div class="card shadow-sm border-0">
+                <!-- 2. US-14: Data Preprocessing Card -->
+                <div class="card shadow-sm border-0 mb-4" id="preprocessing-card">
                     <div class="card-header bg-white py-3 fw-semibold">
-                        <i class="bi bi-sliders me-2 text-primary"></i>2. Configure & Train Model
+                        <i class="bi bi-gear-wide-connected me-2 text-primary"></i>2. Data Preprocessing (US-14)
+                    </div>
+                    <div class="card-body">
+                        <form id="preprocess-form">
+                            <div class="mb-3">
+                                <label for="missing-values-select" class="form-label small fw-semibold">Missing Values Handling</label>
+                                <select class="form-select form-select-sm" id="missing-values-select" disabled>
+                                    <option value="none">None (Keep as-is)</option>
+                                    <option value="drop">Drop Rows with Missing Values</option>
+                                    <option value="mean">Impute with Mean (Numeric) / Mode (Categorical)</option>
+                                    <option value="median">Impute with Median (Numeric) / Mode (Categorical)</option>
+                                    <option value="mode">Impute with Mode (Most Frequent)</option>
+                                    <option value="constant">Impute with Constant (0 / 'missing')</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="encoding-select" class="form-label small fw-semibold">Categorical Feature Encoding</label>
+                                <select class="form-select form-select-sm" id="encoding-select" disabled>
+                                    <option value="none">None (Keep as-is)</option>
+                                    <option value="label">Label Encoding (Integer IDs)</option>
+                                    <option value="onehot">One-Hot Encoding (Indicator Columns)</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="scaling-select" class="form-label small fw-semibold">Feature Scaling (Numeric)</label>
+                                <select class="form-select form-select-sm" id="scaling-select" disabled>
+                                    <option value="none">None (No scaling)</option>
+                                    <option value="minmax">Min-Max Normalization ([0, 1])</option>
+                                    <option value="standard">Standardization (Z-score: mean=0, std=1)</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn btn-outline-primary w-100" id="preprocess-btn" disabled>
+                                <i class="bi bi-magic me-1"></i>Apply Preprocessing
+                            </button>
+                        </form>
+
+                        <div id="preprocess-feedback" class="mt-3 d-none alert alert-info py-2 small"></div>
+                    </div>
+                </div>
+
+                <!-- 3. Model Training Configuration -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white py-3 fw-semibold">
+                        <i class="bi bi-sliders me-2 text-primary"></i>3. Configure & Train Model
                     </div>
                     <div class="card-body">
                         <form id="train-form">
@@ -83,6 +138,9 @@
                                 <select class="form-select" id="target-column-select" disabled required>
                                     <option value="">Upload dataset first...</option>
                                 </select>
+                                <div id="target-column-feedback" class="form-text" role="status" aria-live="polite">
+                                    Upload a dataset and select the column you want to predict.
+                                </div>
                             </div>
 
                             <div class="mb-3">
@@ -109,7 +167,8 @@
                                     <span>Train-Test Split</span>
                                     <span id="split-display" class="text-primary fw-bold">80% Train / 20% Test</span>
                                 </label>
-                                <input type="range" class="form-range" id="split-range" min="0.1" max="0.5" step="0.05" value="0.2">
+                                <input type="range" class="form-range" id="split-range" min="0.1" max="0.5" step="0.05"
+                                    value="0.2">
                             </div>
 
                             <button type="submit" class="btn btn-success w-100" id="train-btn" disabled>
@@ -144,15 +203,180 @@
                     </div>
                 </div>
 
+                <!-- US-13: Dataset Statistics Card -->
+                <div class="card shadow-sm border-0 mb-4" id="statistics-card">
+                    <div class="card-header bg-white py-3 fw-semibold">
+                        <i class="bi bi-bar-chart-line me-2 text-primary"></i>
+                        Dataset Statistics
+                    </div>
+
+                    <div class="card-body">
+                        <div id="statistics-status" class="text-muted small" role="status" aria-live="polite">
+                            Upload a dataset to view its statistics.
+                        </div>
+
+                        <div id="statistics-summary" class="row g-3 mb-3 d-none">
+                            <div class="col-6">
+                                <div class="border rounded p-3">
+                                    <div class="text-muted small">Total Rows</div>
+                                    <div id="statistics-row-count" class="fs-4 fw-bold">—</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded p-3">
+                                    <div class="text-muted small">Total Columns</div>
+                                    <div id="statistics-column-count" class="fs-4 fw-bold">—</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table id="statistics-table" class="table table-hover table-striped table-sm small d-none">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Column</th>
+                                        <th>Type</th>
+                                        <th>Missing</th>
+                                        <th>Mean</th>
+                                        <th>Median</th>
+                                        <th>Min</th>
+                                        <th>Max</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="statistics-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Evaluation Metrics Results Card -->
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-white py-3 fw-semibold">
-                        <i class="bi bi-graph-up-arrow me-2 text-primary"></i>3. Evaluation Results & Performance Metrics
+                        <i class="bi bi-graph-up-arrow me-2 text-primary"></i>3. Evaluation Results & Performance
+                        Metrics
                     </div>
                     <div class="card-body" id="evaluation-container">
                         <div class="text-center text-muted py-4">
                             <i class="bi bi-bar-chart-steps fs-1 d-block mb-2 text-secondary opacity-50"></i>
                             Select target and algorithm to view accuracy, F1 score, MSE, and confusion matrix.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <!-- Admin Modal (FR-7.1 / FR-7.2 / FR-7.3) -->
+    <div class="modal fade" id="adminModal" tabindex="-1" aria-labelledby="adminModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title" id="adminModalLabel">
+                        <i class="bi bi-shield-lock me-2 text-warning"></i>Administrative Control Center (US-14a)
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active fw-semibold" id="tab-users" data-bs-toggle="tab" data-bs-target="#admin-users-pane" type="button" role="tab">
+                                <i class="bi bi-people me-1"></i>User Accounts (FR-7.1)
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-semibold" id="tab-datasets" data-bs-toggle="tab" data-bs-target="#admin-datasets-pane" type="button" role="tab">
+                                <i class="bi bi-database me-1"></i>Dataset Oversight (FR-7.2)
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-semibold" id="tab-logs" data-bs-toggle="tab" data-bs-target="#admin-logs-pane" type="button" role="tab">
+                                <i class="bi bi-journal-text me-1"></i>System Activity Logs (FR-7.3)
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="adminTabsContent">
+                        <!-- 1. Users Tab -->
+                        <div class="tab-pane fade show active" id="admin-users-pane" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-bold mb-0 text-secondary">Registered Platform Users</h6>
+                                <button class="btn btn-outline-primary btn-sm" id="refresh-admin-users-btn">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh Users
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover table-bordered align-middle small">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Username</th>
+                                            <th>Email</th>
+                                            <th>Role</th>
+                                            <th>Status</th>
+                                            <th>Registered</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-users-table-body">
+                                        <tr><td colspan="7" class="text-center text-muted py-3">Loading users...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 2. Datasets Tab -->
+                        <div class="tab-pane fade" id="admin-datasets-pane" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-bold mb-0 text-secondary">Stored Datasets Across Accounts</h6>
+                                <button class="btn btn-outline-primary btn-sm" id="refresh-admin-datasets-btn">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh Datasets
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover table-bordered align-middle small">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Owner</th>
+                                            <th>Filename</th>
+                                            <th>Rows</th>
+                                            <th>Columns</th>
+                                            <th>Uploaded At</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-datasets-table-body">
+                                        <tr><td colspan="7" class="text-center text-muted py-3">Loading datasets...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 3. Logs Tab -->
+                        <div class="tab-pane fade" id="admin-logs-pane" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h6 class="fw-bold mb-0 text-secondary">Application Activity & Audit Logs</h6>
+                                    <span class="text-muted small"><i class="bi bi-shield-check me-1 text-success"></i>Read-Only Audit Trail (SEC-AUD-1 / SEC-AZ-6)</span>
+                                </div>
+                                <button class="btn btn-outline-primary btn-sm" id="refresh-admin-logs-btn">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh Logs
+                                </button>
+                            </div>
+                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                <table class="table table-hover table-striped table-bordered align-middle small font-monospace">
+                                    <thead class="table-dark sticky-top">
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Action</th>
+                                            <th>User</th>
+                                            <th>Details</th>
+                                            <th>IP</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-logs-table-body">
+                                        <tr><td colspan="5" class="text-center text-muted py-3">Loading activity logs...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -164,4 +388,5 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/js/app.js"></script>
 </body>
+
 </html>

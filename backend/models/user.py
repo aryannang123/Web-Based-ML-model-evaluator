@@ -9,6 +9,18 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
+    role = db.Column(
+        db.String(20),
+        nullable=False,
+        default="student",
+        server_default="student"
+    )
+    is_active = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=True,
+        server_default=db.text("1")
+    )
 
     created_at = db.Column(
         db.DateTime,
@@ -40,3 +52,13 @@ class User(db.Model):
         back_populates="user",
         cascade="all, delete-orphan"
     )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "username": self.username,
+            "email": self.email,
+            "role": self.role,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }

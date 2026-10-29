@@ -131,8 +131,67 @@ def login_required(view):
     """Reject API requests without a current, unexpired server-side session."""
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if get_authenticated_user() is None:
+        user = get_authenticated_user()
+        if user is None:
             return jsonify({"error": "Authentication required"}), 401
+        if not getattr(user, "is_active", True):
+            return jsonify({"error": "Account is deactivated. Contact an administrator."}), 403
         return view(*args, **kwargs)
 
     return wrapped
+
+
+def role_required(*allowed_roles):
+    """Reject requests if user is unauthenticated, inactive, or lacks required role."""
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            user = get_authenticated_user()
+            if user is None:
+                return jsonify({"error": "Authentication required"}), 401
+            if not getattr(user, "is_active", True):
+                return jsonify({"error": "Account is deactivated. Contact an administrator."}), 403
+            user_role = getattr(user, "role", "student")
+            if user_role not in allowed_roles:
+                return jsonify({
+                    "error": "Access denied: insufficient permissions",
+                    "required_roles": list(allowed_roles),
+                    "current_role": user_role
+                }), 403
+            return view(*args, **kwargs)
+        return wrapped
+    return decorator
+
+
+def admin_required(view):
+    """Convenience decorator restricting access strictly to Admin role."""
+    return role_required("admin")(view)
+
+
+def log_activity(action, user_id=None, details=None, ip_address=None):
+    """Record an audit event to ActivityLog without exposing sensitive data."""
+    try:
+        from models.activity_log import ActivityLog
+        details_str = details
+        if isinstance(details, dict):
+            import json
+            sanitized = {
+                k: v for k, v in details.items()
+                if k not in ("password", "password_hash", "token", "session_id")
+            }
+            details_str = json.dumps(sanitized)
+        elif isinstance(details_str, str):
+            for sensitive_term in ("password=", "token=", "session_id="):
+                if sensitive_term in details_str:
+                    details_str = details_str.split(sensitive_term)[0] + f"{sensitive_term}[REDACTED]"
+
+        log_entry = ActivityLog(
+            user_id=user_id,
+            action=action,
+            details=details_str,
+            ip_address=ip_address
+        )
+        db.session.add(log_entry)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
