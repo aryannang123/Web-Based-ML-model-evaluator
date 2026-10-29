@@ -95,9 +95,48 @@ class TestFrontendBackendIntegration(unittest.TestCase):
 
         self.assertIn('id="split-range"', page)
         self.assertIn('value="0.2"', page)
+        self.assertIn('id="split-display"', page)
         self.assertIn("updateSplitDisplay", script)
         self.assertIn('addEventListener("input", updateSplitDisplay)', script)
         self.assertIn('apiRequest("/ml/evaluate"', script)
-        self.assertIn("test_size: Number(document.getElementById(\"split-range\").value)", script)
+        self.assertIn('test_size: Number(document.getElementById("split-range").value)', script)
+
+    def test_us12_preview_is_loaded_after_upload_and_rendered_safely(self):
+        frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+        page = (frontend_dir / "index.html").read_text(encoding="utf-8")
+        script = (frontend_dir / "js" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="preview-status"', page)
+        self.assertIn('id="preview-sample-label"', page)
+        self.assertIn('id="preview-table"', page)
+        self.assertIn("<thead", page)
+        self.assertIn("<tbody>", page)
+        self.assertIn("await loadDatasetPreview(result.dataset_id)", script)
+        self.assertIn("/preview", script)
+        self.assertIn("preview.data_types[column]", script)
+        self.assertIn("preview.row_count", script)
+        self.assertIn("preview.column_count", script)
+        self.assertIn("for (const column of preview.columns)", script)
+        self.assertIn("for (const row of preview.rows)", script)
+        self.assertIn("preview.sample_size", script)
+        self.assertIn("cell.textContent", script)
+        self.assertNotIn("innerHTML = row", script)
+
+    def test_auth_and_upload_frontend_flows_remain_wired(self):
+        frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+        page = (frontend_dir / "index.html").read_text(encoding="utf-8")
+        login_page = (frontend_dir / "login.html").read_text(encoding="utf-8")
+        script = (frontend_dir / "js" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="registration-form"', login_page)
+        self.assertIn('id="login-form"', login_page)
+        self.assertIn('id="upload-form"', page)
+        self.assertIn('addEventListener("submit", uploadDataset)', script)
+        self.assertIn('addEventListener("submit", async (event) =>', script)
+        self.assertIn('apiRequest("/auth/register"', script)
+        self.assertIn('apiRequest("/auth/login"', script)
+        self.assertIn('apiRequest("/auth/session")', script)
+        self.assertIn('apiRequest("/dataset/upload"', script)
+
 if __name__ == "__main__":
     unittest.main()

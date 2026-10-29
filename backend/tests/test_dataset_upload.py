@@ -210,6 +210,115 @@ class TestDatasetUpload(unittest.TestCase):
         self.assertEqual(Dataset.query.count(), 0)
         self.assertEqual(os.listdir(self.app.config["UPLOAD_FOLDER"]), [])
 
+    def test_authenticated_preview_returns_headers_values_types_and_full_dimensions(self):
+        self.authenticate()
+        contents = "name,score,ratio\n" + "".join(
+            f"student-{index},{index},{index + 0.5}\n" for index in range(13)
+        )
+        uploaded = self.upload(contents.encode("utf-8"))
+        self.assertEqual(uploaded.status_code, 201)
+
+        response = self.client.get(f"/api/dataset/{uploaded.json['dataset_id']}/preview")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["columns"], ["name", "score", "ratio"])
+        self.assertEqual(response.json["rows"][0], {
+            "name": "student-0", "score": 0, "ratio": 0.5
+        })
+        self.assertIn(response.json["data_types"]["name"], {"object", "str"})
+        self.assertEqual(response.json["data_types"]["score"], "int64")
+        self.assertEqual(response.json["data_types"]["ratio"], "float64")
+        self.assertEqual(response.json["row_count"], 13)
+        self.assertEqual(response.json["column_count"], 3)
+        self.assertEqual(response.json["sample_size"], 10)
+        self.assertEqual(len(response.json["rows"]), 10)
+        self.assertNotIn("file_path", response.json)
+
+    def test_preview_serializes_missing_cells_as_null(self):
+        self.authenticate()
+        uploaded = self.upload(b"feature,target\n1,\n,yes\n3,no\n")
+        self.assertEqual(uploaded.status_code, 201)
+
+        response = self.client.get(f"/api/dataset/{uploaded.json['dataset_id']}/preview")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["rows"][0], {"feature": 1, "target": None})
+        self.assertEqual(response.json["rows"][1], {"feature": None, "target": "yes"})
+
+    def test_preview_requires_authentication(self):
+        response = self.client.get("/api/dataset/1/preview")
+        self.assertEqual(response.status_code, 401)
+
+    def test_preview_hides_datasets_owned_by_another_user(self):
+        self.authenticate()
+        other_user = User(
+            username=f"other_{uuid4().hex[:12]}",
+            email=f"{uuid4().hex}@example.com",
+            password_hash=generate_password_hash("other-password-123"),
+        )
+        db.session.add(other_user)
+        db.session.flush()
+        path = os.path.join(self.app.config["UPLOAD_FOLDER"], "other-user.csv")
+        os.makedirs(self.app.config["UPLOAD_FOLDER"], exist_ok=True)
+        with open(path, "w", encoding="utf-8") as saved:
+            saved.write("secret,value\nprivate,1\n")
+        dataset = Dataset(
+            user_id=other_user.id,
+            filename="secret.csv",
+            file_path=path,
+            file_size=24,
+            row_count=1,
+            column_count=2,
+        )
+        db.session.add(dataset)
+        db.session.commit()
+
+        response = self.client.get(f"/api/dataset/{dataset.id}/preview")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json["error"], "Dataset not found")
+        self.assertNotIn("secret", response.get_data(as_text=True))
+
+    def test_preview_nonexistent_dataset_returns_404(self):
+        self.authenticate()
+        response = self.client.get("/api/dataset/999999/preview")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json["error"], "Dataset not found")
+
+    def test_preview_missing_file_returns_clear_404_without_path(self):
+        self.authenticate()
+        uploaded = self.upload(b"feature,target\n1,yes\n2,no\n")
+        dataset = db.session.get(Dataset, uploaded.json["dataset_id"])
+        os.remove(dataset.file_path)
+
+        response = self.client.get(f"/api/dataset/{dataset.id}/preview")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("file is missing", response.json["error"].lower())
+        self.assertNotIn(dataset.file_path, response.get_data(as_text=True))
+
+    def test_preview_unreadable_file_returns_clear_500(self):
+        self.authenticate()
+        uploaded = self.upload(b"feature,target\n1,yes\n2,no\n")
+        with patch("routes.dataset_routes.pd.read_csv", side_effect=PermissionError("private path")):
+            response = self.client.get(f"/api/dataset/{uploaded.json['dataset_id']}/preview")
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json["error"], "The dataset file could not be read.")
+        self.assertNotIn("private path", response.get_data(as_text=True))
+
+    def test_preview_malformed_csv_returns_clear_400(self):
+        self.authenticate()
+        uploaded = self.upload(b"feature,target\n1,yes\n2,no\n")
+        dataset = db.session.get(Dataset, uploaded.json["dataset_id"])
+        with open(dataset.file_path, "wb") as saved:
+            saved.write(b'feature,target\n"unterminated,yes\n')
+
+        response = self.client.get(f"/api/dataset/{dataset.id}/preview")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("malformed", response.json["error"].lower())
+
 
 if __name__ == "__main__":
     unittest.main()

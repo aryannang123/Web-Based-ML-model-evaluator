@@ -141,10 +141,9 @@ async function uploadDataset(event) {
             `${result.filename} uploaded successfully: ${result.row_count} rows and ${result.column_count} columns.`,
             true
         );
-        document.getElementById("dataset-meta").textContent =
-            `${result.row_count} rows · ${result.column_count} columns`;
         currentDatasetId = result.dataset_id;
         populateTrainingOptions(result.columns || []);
+        await loadDatasetPreview(result.dataset_id);
         form.reset();
     } catch (error) {
         showUploadFeedback(
@@ -260,6 +259,66 @@ function renderEvaluationResult(result) {
         list.append(term, detail);
     }
     container.appendChild(list);
+}
+
+async function loadDatasetPreview(datasetId) {
+    const status = document.getElementById("preview-status");
+    const table = document.getElementById("preview-table");
+    const header = table?.querySelector("thead");
+    const body = table?.querySelector("tbody");
+    const sampleLabel = document.getElementById("preview-sample-label");
+    if (!status || !table || !header || !body) return;
+
+    header.replaceChildren();
+    body.replaceChildren();
+    sampleLabel?.classList.add("d-none");
+    status.className = "px-3 py-3 text-muted small";
+    status.textContent = "Loading dataset sample…";
+
+    try {
+        const preview = await apiRequest(`/dataset/${encodeURIComponent(datasetId)}/preview`);
+        document.getElementById("dataset-meta").textContent =
+            `${preview.row_count} rows · ${preview.column_count} columns`;
+
+        const headerRow = document.createElement("tr");
+        for (const column of preview.columns) {
+            const cell = document.createElement("th");
+            cell.scope = "col";
+            cell.className = "p-3";
+            const name = document.createElement("div");
+            name.textContent = column;
+            const type = document.createElement("span");
+            type.className = "d-block fw-normal text-muted mt-1";
+            type.textContent = preview.data_types[column] || "unknown";
+            cell.append(name, type);
+            headerRow.appendChild(cell);
+        }
+        header.appendChild(headerRow);
+
+        for (const row of preview.rows) {
+            const tableRow = document.createElement("tr");
+            for (const column of preview.columns) {
+                const cell = document.createElement("td");
+                const value = row[column];
+                cell.textContent = value === null || value === undefined ? "—" : String(value);
+                tableRow.appendChild(cell);
+            }
+            body.appendChild(tableRow);
+        }
+
+        if (preview.sample_size === 0) {
+            status.textContent = "This dataset has no data rows to preview.";
+            status.className = "px-3 py-3 text-muted small";
+        } else {
+            status.textContent = `Showing ${preview.sample_size} sample row${preview.sample_size === 1 ? "" : "s"} of ${preview.row_count} total.`;
+            status.className = "px-3 py-2 text-muted small";
+        }
+        sampleLabel?.classList.remove("d-none");
+    } catch (error) {
+        document.getElementById("dataset-meta").textContent = "Preview unavailable";
+        status.className = "px-3 py-3 text-danger small";
+        status.textContent = error.message || "Could not load the dataset preview.";
+    }
 }
 
 function showUploadFeedback(message, success) {
