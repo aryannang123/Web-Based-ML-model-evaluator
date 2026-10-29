@@ -161,5 +161,17 @@ class TestFrontendBackendIntegration(unittest.TestCase):
         self.assertIn('loadAdminLogs', script)
 
 
+    def test_us17_to_us20_frontend_catalog_history_comparison_and_review_are_wired(self):
+        frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+        script = (frontend_dir / "js" / "app.js").read_text(encoding="utf-8")
+        page = (frontend_dir / "index.html").read_text(encoding="utf-8")
+        self.assertIn('apiRequest("/ml/algorithms")', script)
+        self.assertIn('"/ml/compare"', script)
+        self.assertIn('"/ml/instructor/evaluations"', script)
+        self.assertIn("result.confusion_matrix", script)
+        self.assertIn('id="run-history-body"', page)
+        self.assertIn('id="instructor-mode-banner"', page)
+
+
 if __name__ == "__main__":
     unittest.main()

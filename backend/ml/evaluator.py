@@ -1,7 +1,4 @@
 # Machine Learning Model Evaluation Module
-#
-# TODO: US-19: Implement model evaluation and visualization (Assigned to: @abhishekdeene-eng)
-# TODO: US-20: Implement model comparison and result downloads (Assigned to: @nidhipoojamrutha20)
 
 import math
 

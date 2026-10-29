@@ -13,6 +13,8 @@ document.addEventListener("DOMContentLoaded", () => {
     setupLoginForm();
     setupRegistrationForm();
     setupAdminPanel();
+    document.getElementById("refresh-history-btn")?.addEventListener("click", loadRunHistory);
+    document.getElementById("compare-runs-btn")?.addEventListener("click", compareSelectedRuns);
     restoreSession();
 });
 
@@ -99,7 +101,6 @@ function setupEventListeners() {
     document.getElementById("split-range")
         ?.addEventListener("input", updateSplitDisplay);
     updateSplitDisplay();
-    // TODO: US-15 - Target column dropdown listener (Abhishek).
 
 
     // US-14: Data Preprocessing form listener.
@@ -144,7 +145,6 @@ function setupEventListeners() {
     }
     // TODO: US-16 - Split ratio range slider listener (Nidhi).
     // TODO: US-18 - Train button listener (Aryan).
-    // TODO: US-19 - Render evaluation metrics and confusion matrix (Abhishek).
 
     const logoutBtn = document.getElementById("logout-btn");
 
@@ -195,10 +195,10 @@ async function applyPreprocessing(event) {
 
     if (button) {
         button.disabled = true;
-        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Applying Preprocessing…';
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Applying Preprocessingâ€¦';
     }
 
-    showPreprocessFeedback("Executing preprocessing transformations on dataset…", true);
+    showPreprocessFeedback("Executing preprocessing transformations on datasetâ€¦", true);
     const feedback = document.getElementById("preprocess-feedback");
     if (feedback) {
         feedback.classList.remove("alert-success", "alert-danger");
@@ -307,7 +307,7 @@ function updateDatasetDisplay(dataset) {
 
     if (datasetMeta) {
         datasetMeta.textContent =
-            `${dataset.filename} · ${dataset.row_count} rows · ${dataset.column_count} columns`;
+            `${dataset.filename} Â· ${dataset.row_count} rows Â· ${dataset.column_count} columns`;
     }
 
     if (Array.isArray(dataset.columns)) {
@@ -335,8 +335,8 @@ async function uploadDataset(event) {
     if (button) {
         button.disabled = true;
         button.textContent = isReplacement
-            ? "Replacing…"
-            : "Uploading…";
+            ? "Replacingâ€¦"
+            : "Uploadingâ€¦";
     }
 
     const feedback = document.getElementById("upload-feedback");
@@ -349,8 +349,8 @@ async function uploadDataset(event) {
         );
         feedback.classList.add("alert-info");
         feedback.textContent = isReplacement
-            ? "Validating and replacing the active dataset…"
-            : "Validating and uploading your CSV…";
+            ? "Validating and replacing the active datasetâ€¦"
+            : "Validating and uploading your CSVâ€¦";
     }
 
     try {
@@ -425,7 +425,7 @@ async function evaluateDataset(event) {
     }
 
     trainButton.disabled = true;
-    feedback.textContent = "Training and evaluating the model…";
+    feedback.textContent = "Training and evaluating the modelâ€¦";
     feedback.className = "card-body text-muted";
     try {
         const result = await apiRequest("/ml/evaluate", {
@@ -476,6 +476,17 @@ function renderEvaluationResult(result) {
         list.append(term, detail);
     }
     container.appendChild(list);
+    if (Array.isArray(result.confusion_matrix) && result.confusion_matrix.length) {
+        const heading = document.createElement("h6"); heading.className = "mt-4"; heading.textContent = "Confusion Matrix"; container.appendChild(heading);
+        const table = document.createElement("table"); table.className = "table table-bordered table-sm confusion-matrix-table";
+        result.confusion_matrix.forEach((rowValues) => {
+            const row = document.createElement("tr");
+            rowValues.forEach((value) => { const cell=document.createElement("td"); cell.textContent=String(value); row.appendChild(cell); });
+            table.appendChild(row);
+        });
+        container.appendChild(table);
+    }
+    if (result.evaluation_id) loadRunHistory();
 }
 
 async function loadDatasetPreview(datasetId) {
@@ -490,12 +501,12 @@ async function loadDatasetPreview(datasetId) {
     body.replaceChildren();
     sampleLabel?.classList.add("d-none");
     status.className = "px-3 py-3 text-muted small";
-    status.textContent = "Loading dataset sample…";
+    status.textContent = "Loading dataset sampleâ€¦";
 
     try {
         const preview = await apiRequest(`/dataset/${encodeURIComponent(datasetId)}/preview`);
         document.getElementById("dataset-meta").textContent =
-            `${preview.row_count} rows · ${preview.column_count} columns`;
+            `${preview.row_count} rows Â· ${preview.column_count} columns`;
 
         const headerRow = document.createElement("tr");
         for (const column of preview.columns) {
@@ -517,7 +528,7 @@ async function loadDatasetPreview(datasetId) {
             for (const column of preview.columns) {
                 const cell = document.createElement("td");
                 const value = row[column];
-                cell.textContent = value === null || value === undefined ? "—" : String(value);
+                cell.textContent = value === null || value === undefined ? "â€”" : String(value);
                 tableRow.appendChild(cell);
             }
             body.appendChild(tableRow);
@@ -583,7 +594,7 @@ async function loadDatasetStatistics(datasetId) {
 
                 cell.textContent =
                     value === null || value === undefined
-                        ? "—"
+                        ? "â€”"
                         : typeof value === "number"
                             ? Number(value.toFixed(2)).toString()
                             : String(value);
@@ -823,7 +834,15 @@ async function restoreSession() {
             logoutBtn.classList.remove("d-none");
         }
 
+        const readOnly = userRole === "instructor";
+        document.getElementById("instructor-mode-banner")?.classList.toggle("d-none", !readOnly);
+        for (const id of ["upload-form", "preprocess-form", "train-form"]) {
+            const form = document.getElementById(id);
+            form?.closest(".card")?.classList.toggle("d-none", readOnly);
+        }
+        await loadAlgorithmCatalog();
         await restoreActiveDataset();
+        await loadRunHistory();
 
     } catch {
         activeDatasetId = null;
@@ -877,7 +896,7 @@ function setupRegistrationForm() {
         });
 }
 
-// ─── Administrative Control Center (US-14a / FR-7.1, 7.2, 7.3) ───────────────
+// â”€â”€â”€ Administrative Control Center (US-14a / FR-7.1, 7.2, 7.3) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function setupAdminPanel() {
     const adminModal = document.getElementById("adminModal");
@@ -1028,4 +1047,75 @@ async function loadAdminLogs() {
     } catch (error) {
         tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3">Failed to load logs: ${error.message}</td></tr>`;
     }
+}
+
+
+async function loadAlgorithmCatalog() {
+    const select = document.getElementById("algorithm-select");
+    if (!select) return;
+    try {
+        const catalog = await apiRequest("/ml/algorithms");
+        select.replaceChildren(new Option("Choose an algorithm...", ""));
+        for (const [task, algorithms] of Object.entries(catalog)) {
+            const group = document.createElement("optgroup");
+            group.label = task === "regression" ? "Regression" : "Classification";
+            for (const item of algorithms) group.appendChild(new Option(item.label, item.id));
+            select.appendChild(group);
+        }
+    } catch (error) { console.error("Algorithm catalog unavailable:", error.message); }
+}
+
+async function loadRunHistory() {
+    const body = document.getElementById("run-history-body");
+    if (!body) return;
+    try {
+        const path = document.getElementById("user-role-badge")?.textContent === "instructor"
+            ? "/ml/instructor/evaluations" : "/ml/evaluations";
+        const data = await apiRequest(path);
+        body.replaceChildren();
+        for (const run of data.evaluations || []) {
+            const row = document.createElement("tr");
+            const metrics = Object.entries(run.metrics || {}).map(([key, value]) => `${key}: ${typeof value === "number" ? value.toFixed(3) : value}`).join(" · ");
+            const readOnly = path.includes("instructor");
+            row.innerHTML = `<td>${readOnly ? "" : `<input class="form-check-input compare-run" type="checkbox" value="${run.id}" aria-label="Select run ${run.id}">`}</td><td>${run.id}</td><td></td><td></td><td></td><td></td>`;
+            row.cells[2].textContent = run.model_name || run.algorithm;
+            row.cells[3].textContent = metrics;
+            row.cells[4].textContent = readOnly ? (run.owner || "Shared") : (run.shared_with_instructors ? "Shared" : "Private");
+            const actions = row.cells[5];
+            if (!readOnly) {
+                const share = document.createElement("button"); share.className = "btn btn-sm btn-outline-secondary me-1"; share.textContent = run.shared_with_instructors ? "Unshare" : "Share";
+                share.onclick = async () => { await apiRequest(`/ml/evaluations/${run.id}/sharing`, {method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({shared_with_instructors:!run.shared_with_instructors})}); loadRunHistory(); };
+                actions.appendChild(share);
+                const modelId = run.model_id;
+                const modelLink = document.createElement("a"); modelLink.className = "btn btn-sm btn-outline-primary me-1"; modelLink.href = `/api/ml/models/${modelId}/download`; modelLink.textContent = "Model"; actions.appendChild(modelLink);
+            }
+            const report = document.createElement("a"); report.className = "btn btn-sm btn-outline-primary"; report.href = `/api/ml/evaluations/${run.id}/report`; report.textContent = "PDF"; actions.appendChild(report);
+            body.appendChild(row);
+        }
+        if (!body.children.length) body.innerHTML = '<tr><td colspan="6">No shared evaluations are available.</td></tr>';
+        const instructor = path.includes("instructor");
+        document.getElementById("compare-runs-btn")?.classList.toggle("d-none", instructor);
+    } catch (error) {
+        body.replaceChildren();
+        const row = document.createElement("tr"); const cell = document.createElement("td");
+        cell.colSpan = 6; cell.textContent = error.message; row.appendChild(cell); body.appendChild(row);
+    }
+}
+
+async function compareSelectedRuns() {
+    const selected = Array.from(document.querySelectorAll(".compare-run:checked"), item => Number(item.value));
+    const target = document.getElementById("comparison-results");
+    if (selected.length < 2) { target.textContent = "Select at least two runs to compare."; return; }
+    try {
+        const {evaluations} = await apiRequest("/ml/compare", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({evaluation_ids:selected})});
+        target.replaceChildren();
+        const table = document.createElement("table"); table.className = "table table-bordered table-sm";
+        const head = document.createElement("tr"); head.innerHTML = "<th>Metric</th>";
+        evaluations.forEach(run => { const th=document.createElement("th"); th.textContent=`Run ${run.id} · ${run.algorithm}`; head.appendChild(th); });
+        const thead=document.createElement("thead"); thead.appendChild(head); table.appendChild(thead);
+        const metrics=[...new Set(evaluations.flatMap(run=>Object.keys(run.metrics||{})))];
+        const tbody=document.createElement("tbody");
+        metrics.forEach(metric=>{const row=document.createElement("tr"); const name=document.createElement("th"); name.textContent=metric; row.appendChild(name); evaluations.forEach(run=>{const td=document.createElement("td"); td.textContent=run.metrics?.[metric] ?? "—"; row.appendChild(td);}); tbody.appendChild(row);});
+        table.appendChild(tbody); target.appendChild(table);
+    } catch(error) { target.textContent=error.message; }
 }

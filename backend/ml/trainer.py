@@ -1,7 +1,4 @@
 # Machine Learning Model Training Module
-#
-# TODO: US-17: Implement ML algorithm selection (Assigned to: @gaganraghavan)
-# TODO: US-18: Implement model training (Assigned to: @aryannang123)
 
 import joblib
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -20,6 +17,30 @@ class ModelTrainer:
         "random_forest",
         "knn"
     ]
+
+    ALGORITHM_CATALOG = {
+        "classification": [
+            {"id": "logistic_regression", "label": "Logistic Regression", "description": "Linear classifier for categorical targets."},
+            {"id": "decision_tree", "label": "Decision Tree", "description": "Interpretable tree-based classifier."},
+            {"id": "random_forest", "label": "Random Forest", "description": "Ensemble of randomized decision trees."},
+            {"id": "knn", "label": "K-Nearest Neighbors", "description": "Classifies using nearby training samples."},
+        ],
+        "regression": [
+            {"id": "linear_regression", "label": "Linear Regression", "description": "Linear model for numeric targets."},
+            {"id": "decision_tree", "label": "Decision Tree Regressor", "description": "Tree-based regressor for numeric targets."},
+            {"id": "random_forest", "label": "Random Forest Regressor", "description": "Ensemble regressor using randomized trees."},
+            {"id": "knn", "label": "K-Nearest Neighbors Regressor", "description": "Predicts from nearby training samples."},
+        ],
+    }
+
+    @classmethod
+    def algorithms_for(cls, task_type=None):
+        """Return a copy of the supported algorithm catalog."""
+        if task_type is None:
+            return {task: [dict(item) for item in entries] for task, entries in cls.ALGORITHM_CATALOG.items()}
+        if task_type not in cls.ALGORITHM_CATALOG:
+            raise ValueError("task_type must be classification or regression.")
+        return [dict(item) for item in cls.ALGORITHM_CATALOG[task_type]]
 
     @classmethod
     def train(cls, algorithm_name: str, task_type: str, X_train, y_train, **kwargs):

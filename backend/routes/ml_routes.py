@@ -4,7 +4,10 @@ from numbers import Real
 from uuid import uuid4
 
 import pandas as pd
-from flask import Blueprint, current_app, g, jsonify, request
+from flask import Blueprint, current_app, g, jsonify, request, send_file
+from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 from sqlalchemy.exc import SQLAlchemyError
 
 from database.db import db
@@ -19,6 +22,8 @@ from routes.auth_utils import (
     get_owned_evaluation,
     get_owned_model,
     login_required,
+    non_instructor_required,
+    role_required,
     owned_evaluation_query,
     owned_model_query,
 )
@@ -48,6 +53,9 @@ def _evaluation_response(result):
         "confusion_matrix": result.confusion_matrix_json,
         "report": result.report_json,
         "created_at": result.created_at.isoformat() if result.created_at else None,
+        "shared_with_instructors": bool(result.shared_with_instructors),
+        "model_name": result.model.model_name,
+        "configuration": result.model.config_json,
     }
 
 
@@ -55,8 +63,7 @@ def _evaluation_response(result):
 @login_required
 def get_algorithms():
     return jsonify({
-        "classification": ["logistic_regression", "decision_tree", "random_forest", "knn"],
-        "regression": ["linear_regression", "decision_tree", "random_forest", "knn"]
+        **ModelTrainer.algorithms_for()
     }), 200
 
 
@@ -96,9 +103,120 @@ def get_evaluation(evaluation_id):
     return jsonify({"evaluation": _evaluation_response(result)}), 200
 
 
+
+@ml_bp.route("/compare", methods=["POST"])
+@login_required
+def compare_evaluations():
+    payload = request.get_json(silent=True) if request.is_json else None
+    ids = payload.get("evaluation_ids") if isinstance(payload, dict) else None
+    valid_ids = isinstance(ids, list) and 2 <= len(ids) <= 10
+    if not valid_ids or any(type(item) is not int for item in ids) or len(set(ids)) != len(ids):
+        return jsonify({"error": "Select between 2 and 10 distinct evaluation IDs."}), 400
+    results = owned_evaluation_query(g.current_user.id).filter(EvaluationResult.id.in_(ids)).all()
+    if len(results) != len(ids):
+        return jsonify({"error": "One or more evaluations were not found."}), 404
+    tasks = {(item.model.config_json or {}).get("task_type") for item in results}
+    if len(tasks) != 1:
+        return jsonify({"error": "Only evaluations for the same task type can be compared."}), 400
+    return jsonify({"evaluations": [_evaluation_response(item) for item in results]}), 200
+
+
+def _owned_artifact(model_id):
+    model = get_owned_model(model_id, g.current_user.id)
+    if model is None:
+        return None, None
+    folder = os.path.realpath(current_app.config["SAVED_MODELS_FOLDER"])
+    path = os.path.realpath(model.model_path or "")
+    try:
+        safe = os.path.commonpath([folder, path]) == folder
+    except ValueError:
+        safe = False
+    return model, path if safe and os.path.isfile(path) else None
+
+
+@ml_bp.route("/models/<int:model_id>/download", methods=["GET"])
+@login_required
+def download_model(model_id):
+    model, path = _owned_artifact(model_id)
+    if model is None or path is None:
+        return jsonify({"error": "Model artifact not found."}), 404
+    return send_file(path, as_attachment=True, download_name=f"model-{model.id}-{model.algorithm}.joblib")
+
+
+@ml_bp.route("/evaluations/<int:evaluation_id>/report", methods=["GET"])
+@login_required
+def download_report(evaluation_id):
+    result = get_owned_evaluation(evaluation_id, g.current_user.id)
+    if result is None and getattr(g.current_user, "role", "student") == "instructor":
+        result = EvaluationResult.query.filter_by(id=evaluation_id, shared_with_instructors=True).first()
+    if result is None:
+        return jsonify({"error": "Evaluation not found."}), 404
+    output = BytesIO()
+    pdf = canvas.Canvas(output, pagesize=letter)
+    width, height = letter
+    y = height - 54
+    pdf.setTitle(f"Evaluation report {result.id}")
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(48, y, "ML Model Evaluation Report")
+    y -= 30
+    pdf.setFont("Helvetica", 10)
+    lines = [f"Run ID: {result.id}", f"Model: {result.model.model_name}",
+             f"Algorithm: {result.model.algorithm}", f"Created: {result.created_at}"]
+    lines.extend(f"{key}: {value}" for key, value in (result.model.config_json or {}).items())
+    lines.extend(f"{key}: {value}" for key, value in (result.metrics_json or {}).items())
+    for line in lines:
+        if y < 48:
+            pdf.showPage()
+            y = height - 48
+            pdf.setFont("Helvetica", 10)
+        pdf.drawString(48, y, line[:110])
+        y -= 17
+    pdf.save()
+    output.seek(0)
+    return send_file(output, mimetype="application/pdf", as_attachment=True,
+                     download_name=f"evaluation-{result.id}.pdf")
+
+
+@ml_bp.route("/evaluations/<int:evaluation_id>/sharing", methods=["PATCH"])
+@non_instructor_required
+def update_evaluation_sharing(evaluation_id):
+    result = get_owned_evaluation(evaluation_id, g.current_user.id)
+    if result is None:
+        return jsonify({"error": "Evaluation not found."}), 404
+    payload = request.get_json(silent=True) if request.is_json else None
+    if not isinstance(payload, dict) or type(payload.get("shared_with_instructors")) is not bool:
+        return jsonify({"error": "shared_with_instructors must be a boolean."}), 400
+    result.shared_with_instructors = payload["shared_with_instructors"]
+    db.session.commit()
+    return jsonify({"evaluation_id": result.id,
+                    "shared_with_instructors": result.shared_with_instructors}), 200
+
+
+@ml_bp.route("/instructor/evaluations", methods=["GET"])
+@role_required("instructor")
+def instructor_evaluations():
+    results = (EvaluationResult.query.join(MLModel).join(Dataset)
+               .filter(EvaluationResult.shared_with_instructors.is_(True))
+               .order_by(EvaluationResult.created_at.desc(), EvaluationResult.id.desc()).all())
+    return jsonify({"evaluations": [
+        {**_evaluation_response(item), "owner": item.user.username} for item in results
+    ]}), 200
+
+
+@ml_bp.route("/instructor/evaluations/<int:evaluation_id>", methods=["GET"])
+@role_required("instructor")
+def instructor_evaluation(evaluation_id):
+    result = (EvaluationResult.query.join(MLModel).join(Dataset)
+              .filter(EvaluationResult.id == evaluation_id,
+                      EvaluationResult.shared_with_instructors.is_(True)).first())
+    if result is None:
+        return jsonify({"error": "Evaluation not found."}), 404
+    return jsonify({"evaluation": {**_evaluation_response(result),
+                                   "owner": result.user.username}}), 200
+
 @ml_bp.route("/train", methods=["POST"])
 @ml_bp.route("/evaluate", methods=["POST"])
-@login_required
+@non_instructor_required
 def evaluate_model():
     if not request.is_json:
         return jsonify({"error": "A JSON request body is required."}), 400
