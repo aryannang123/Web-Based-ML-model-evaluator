@@ -188,7 +188,7 @@
             <!-- Right: Preview, Evaluation Metrics & Results -->
             <div class="col-lg-7">
                 <!-- Dataset Preview Tab -->
-                <div class="card shadow-sm border-0 mb-4">
+                <div class="card shadow-sm border-0 mb-4" id="dataset-preview-card">
                     <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                         <span class="fw-semibold"><i class="bi bi-table me-2 text-primary"></i>Dataset Preview</span>
                         <span id="dataset-meta" class="badge bg-light text-dark border">No dataset loaded</span>
@@ -256,7 +256,7 @@
                 </div>
 
                 <!-- Evaluation Metrics Results Card -->
-                <div class="card shadow-sm border-0">
+                <div class="card shadow-sm border-0" id="evaluation-results-card">
                     <div class="card-header bg-white py-3 fw-semibold">
                         <i class="bi bi-graph-up-arrow me-2 text-primary"></i>3. Evaluation Results & Performance
                         Metrics
@@ -270,7 +270,7 @@
                 </div>
                 <div class="card shadow-sm border-0 mt-4" id="run-history-card">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                        <strong>My Run History</strong>
+                        <strong id="run-history-title">My Run History</strong>
                         <button class="btn btn-outline-primary btn-sm" id="refresh-history-btn"
                             type="button">Refresh</button>
                     </div>
@@ -280,7 +280,7 @@
                         <div class="table-responsive">
                             <table class="table table-sm align-middle">
                                 <thead>
-                                    <tr>
+                                    <tr id="run-history-header">
                                         <th>Select</th>
                                         <th>Run</th>
                                         <th>Model</th>
@@ -296,9 +296,10 @@
                                 </tbody>
                             </table>
                         </div>
-                        <button class="btn btn-outline-primary btn-sm" id="compare-runs-btn" type="button">Compare
-                            selected runs</button>
+                        <button class="btn btn-outline-primary btn-sm" id="compare-runs-btn" type="button">
+                            Compare selected runs</button>
                         <div id="comparison-results" class="mt-3" aria-live="polite"></div>
+                        <section id="instructor-review-details" class="mt-4 d-none" aria-live="polite"></section>
                     </div>
                 </div>
             </div>

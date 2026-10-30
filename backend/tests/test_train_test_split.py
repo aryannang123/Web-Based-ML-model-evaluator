@@ -234,22 +234,83 @@ class TestTrainTestSplit(unittest.TestCase):
 
     def test_us19a_instructor_sees_only_shared_runs_and_cannot_write(self):
         dataset_id = self.upload()
-        run = self.evaluate(dataset_id)
-        private_run = self.evaluate(dataset_id, algorithm="random_forest")
-        self.assertEqual(run.status_code, 201, run.json)
+        private_run = self.evaluate(dataset_id)
         self.assertEqual(private_run.status_code, 201, private_run.json)
+
+        peer_client = self.app.test_client()
+        peer_suffix = uuid4().hex
+        self.assertEqual(peer_client.post("/api/auth/register", json={
+            "username": f"peer_{peer_suffix[:12]}",
+            "email": f"{peer_suffix}@example.com",
+            "password": "StrongPass123!",
+        }).status_code, 201)
+        self.assertEqual(peer_client.post("/api/auth/login", json={
+            "username": f"peer_{peer_suffix[:12]}",
+            "password": "StrongPass123!",
+        }).status_code, 200)
+        peer_upload = peer_client.post(
+            "/api/dataset/upload",
+            data={"file": (io.BytesIO(self.csv_rows(20)), "peer.csv")},
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(peer_upload.status_code, 201, peer_upload.json)
+        peer_dataset_id = peer_upload.json["dataset_id"]
+        run = peer_client.post("/api/ml/evaluate", json={
+            "dataset_id": peer_dataset_id,
+            "target_column": "target",
+            "algorithm": "decision_tree",
+            "task_type": "classification",
+        })
+        second_shared_run = peer_client.post("/api/ml/evaluate", json={
+            "dataset_id": peer_dataset_id,
+            "target_column": "target",
+            "algorithm": "random_forest",
+            "task_type": "classification",
+        })
+        self.assertEqual(run.status_code, 201, run.json)
+        self.assertEqual(second_shared_run.status_code, 201, second_shared_run.json)
         evaluation_id = run.json["evaluation_id"]
-        self.assertEqual(self.client.patch(f"/api/ml/evaluations/{evaluation_id}/sharing", json={"shared_with_instructors": True}).status_code, 200)
+        self.assertEqual(peer_client.patch(f"/api/ml/evaluations/{evaluation_id}/sharing", json={"shared_with_instructors": True}).status_code, 200)
+        second_shared_id = second_shared_run.json["evaluation_id"]
+        self.assertEqual(peer_client.patch(f"/api/ml/evaluations/{second_shared_id}/sharing", json={"shared_with_instructors": True}).status_code, 200)
         self.user.role = "instructor"
         db.session.commit()
         review = self.client.get("/api/ml/instructor/evaluations")
         self.assertEqual(review.status_code, 200, review.json)
-        self.assertEqual([item["id"] for item in review.json["evaluations"]], [evaluation_id])
+        self.assertEqual({item["id"] for item in review.json["evaluations"]}, {evaluation_id, second_shared_id})
+        detail = self.client.get(f"/api/ml/instructor/evaluations/{evaluation_id}")
+        self.assertEqual(detail.status_code, 200, detail.json)
+        self.assertIn("metrics", detail.json["evaluation"])
+        self.assertIn("confusion_matrix", detail.json["evaluation"])
+        self.assertNotIn("configuration", detail.json["evaluation"])
         self.assertEqual(self.client.get(f"/api/ml/instructor/evaluations/{private_run.json['evaluation_id']}").status_code, 404)
+        missing_detail = self.client.get("/api/ml/instructor/evaluations/999999")
+        self.assertEqual(missing_detail.status_code, 404)
+        self.assertEqual(missing_detail.json, {"error": "Evaluation not found."})
+        compared = self.client.post("/api/ml/instructor/compare", json={"evaluation_ids": [evaluation_id, second_shared_id]})
+        self.assertEqual(compared.status_code, 200, compared.json)
+        self.assertEqual(len(compared.json["evaluations"]), 2)
+        private_comparison = self.client.post("/api/ml/instructor/compare", json={"evaluation_ids": [evaluation_id, private_run.json["evaluation_id"]]})
+        self.assertEqual(private_comparison.status_code, 404)
+        self.assertEqual(self.client.post("/api/ml/compare", json={"evaluation_ids": [evaluation_id, second_shared_id]}).status_code, 403)
+        self.assertEqual(self.client.get("/api/dataset").status_code, 403)
+        self.assertEqual(self.client.get(f"/api/dataset/{dataset_id}").status_code, 403)
+        self.assertEqual(self.client.get(f"/api/dataset/{dataset_id}/preview").status_code, 403)
+        self.assertEqual(self.client.get(f"/api/dataset/{dataset_id}/statistics").status_code, 403)
+        self.assertEqual(self.client.get("/api/ml/models").status_code, 403)
+        self.assertEqual(self.client.get("/api/ml/evaluations").status_code, 403)
+        self.assertEqual(self.client.get(f"/api/ml/evaluations/{evaluation_id}").status_code, 403)
+        self.assertEqual(self.client.get(f"/api/ml/models/{private_run.json['model_id']}/download").status_code, 403)
+        self.assertEqual(self.client.get(f"/api/ml/evaluations/{private_run.json['evaluation_id']}/report").status_code, 403)
+        self.assertEqual(self.client.get(f"/api/ml/evaluations/{evaluation_id}/report").status_code, 403)
         self.assertEqual(self.client.post("/api/ml/evaluate", json={"dataset_id": dataset_id}).status_code, 403)
+        self.assertEqual(self.client.post("/api/ml/train", json={"dataset_id": dataset_id}).status_code, 403)
         upload = self.client.post("/api/dataset/upload", data={"file": (io.BytesIO(self.csv_rows(20)), "other.csv")}, content_type="multipart/form-data")
         self.assertEqual(upload.status_code, 403)
+        replace = self.client.post(f"/api/dataset/{dataset_id}/replace", data={"file": (io.BytesIO(self.csv_rows(20)), "replacement.csv")}, content_type="multipart/form-data")
+        self.assertEqual(replace.status_code, 403)
         self.assertEqual(self.client.post(f"/api/dataset/{dataset_id}/preprocess", json={}).status_code, 403)
+        self.assertEqual(self.client.delete(f"/api/admin/datasets/{dataset_id}").status_code, 403)
         self.assertEqual(self.client.patch(f"/api/ml/evaluations/{evaluation_id}/sharing", json={"shared_with_instructors": False}).status_code, 403)
 
     def test_us17_all_supported_estimators_fit_for_their_task_type(self):

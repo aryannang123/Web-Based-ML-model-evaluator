@@ -237,7 +237,7 @@ def _read_and_validate_upload():
 
 
 @dataset_bp.route("", methods=["GET"])
-@login_required
+@non_instructor_required
 def list_datasets():
     """List datasets belonging to the logged-in user."""
     datasets = (
@@ -252,7 +252,7 @@ def list_datasets():
 
 
 @dataset_bp.route("/<int:dataset_id>", methods=["GET"])
-@login_required
+@non_instructor_required
 def get_dataset(dataset_id):
     """Retrieve an owned dataset's metadata."""
     dataset = get_owned_dataset(dataset_id, g.current_user.id)
@@ -397,7 +397,7 @@ def replace_dataset(dataset_id):
 
 
 @dataset_bp.route("/<int:dataset_id>/preview", methods=["GET"])
-@login_required
+@non_instructor_required
 def preview_dataset(dataset_id):
     dataset = get_owned_dataset(dataset_id, g.current_user.id)
     if dataset is None:
@@ -475,7 +475,7 @@ def preview_dataset(dataset_id):
 
 
 @dataset_bp.route("/<int:dataset_id>/statistics", methods=["GET"])
-@login_required
+@non_instructor_required
 def dataset_statistics(dataset_id):
     """Return descriptive statistics for an owned dataset."""
     dataset = get_owned_dataset(dataset_id, g.current_user.id)

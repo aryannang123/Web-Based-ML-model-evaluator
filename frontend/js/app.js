@@ -1079,8 +1079,18 @@ async function restoreSession() {
             const form = document.getElementById(id);
             form?.closest(".card")?.classList.toggle("d-none", readOnly);
         }
-        await loadAlgorithmCatalog();
-        await restoreActiveDataset();
+        for (const id of ["dataset-preview-card", "statistics-card", "evaluation-results-card"]) {
+            document.getElementById(id)?.classList.toggle("d-none", readOnly);
+        }
+        document.getElementById("run-history-title").textContent = readOnly
+            ? "Shared Evaluation Review" : "My Run History";
+        if (readOnly) {
+            activeDatasetId = null;
+            sessionStorage.removeItem("activeDatasetId");
+        } else {
+            await loadAlgorithmCatalog();
+            await restoreActiveDataset();
+        }
         await loadRunHistory();
 
     } catch {
@@ -1312,32 +1322,148 @@ async function loadRunHistory() {
             ? "/ml/instructor/evaluations" : "/ml/evaluations";
         const data = await apiRequest(path);
         body.replaceChildren();
+        const readOnly = path.includes("instructor");
+        const header = document.getElementById("run-history-header");
+        if (header) {
+            const labels = readOnly
+                ? ["Select", "Run", "Model", "Metrics", "Student", "Review"]
+                : ["Select", "Run", "Model", "Metrics", "Shared", "Downloads"];
+            header.replaceChildren(...labels.map((label) => {
+                const cell = document.createElement("th");
+                cell.textContent = label;
+                return cell;
+            }));
+        }
+        document.getElementById("instructor-review-details")?.classList.toggle("d-none", !readOnly);
         for (const run of data.evaluations || []) {
             const row = document.createElement("tr");
             const metrics = Object.entries(run.metrics || {}).map(([key, value]) => `${key}: ${typeof value === "number" ? value.toFixed(3) : value}`).join(" · ");
-            const readOnly = path.includes("instructor");
-            row.innerHTML = `<td>${readOnly ? "" : `<input class="form-check-input compare-run" type="checkbox" value="${run.id}" aria-label="Select run ${run.id}">`}</td><td>${run.id}</td><td></td><td></td><td></td><td></td>`;
+            row.innerHTML = `<td><input class="form-check-input compare-run" type="checkbox" value="${run.id}" aria-label="Select run ${run.id}"></td><td>${run.id}</td><td></td><td></td><td></td><td></td>`;
             row.cells[2].textContent = run.model_name || run.algorithm;
             row.cells[3].textContent = metrics;
             row.cells[4].textContent = readOnly ? (run.owner || "Shared") : (run.shared_with_instructors ? "Shared" : "Private");
             const actions = row.cells[5];
-            if (!readOnly) {
+            if (readOnly) {
+                const view = document.createElement("button");
+                view.type = "button";
+                view.className = "btn btn-sm btn-outline-primary";
+                view.textContent = "View results";
+                view.addEventListener("click", () => loadInstructorEvaluation(run.id));
+                actions.appendChild(view);
+            } else {
                 const share = document.createElement("button"); share.className = "btn btn-sm btn-outline-secondary me-1"; share.textContent = run.shared_with_instructors ? "Unshare" : "Share";
                 share.onclick = async () => { await apiRequest(`/ml/evaluations/${run.id}/sharing`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shared_with_instructors: !run.shared_with_instructors }) }); loadRunHistory(); };
                 actions.appendChild(share);
                 const modelId = run.model_id;
                 const modelLink = document.createElement("a"); modelLink.className = "btn btn-sm btn-outline-primary me-1"; modelLink.href = `/api/ml/models/${modelId}/download`; modelLink.textContent = "Model"; actions.appendChild(modelLink);
             }
-            const report = document.createElement("a"); report.className = "btn btn-sm btn-outline-primary"; report.href = `/api/ml/evaluations/${run.id}/report`; report.textContent = "PDF"; actions.appendChild(report);
+            if (!readOnly) {
+                const report = document.createElement("a"); report.className = "btn btn-sm btn-outline-primary"; report.href = `/api/ml/evaluations/${run.id}/report`; report.textContent = "PDF"; actions.appendChild(report);
+            }
             body.appendChild(row);
         }
         if (!body.children.length) body.innerHTML = '<tr><td colspan="6">No shared evaluations are available.</td></tr>';
-        const instructor = path.includes("instructor");
-        document.getElementById("compare-runs-btn")?.classList.toggle("d-none", instructor);
+        document.getElementById("compare-runs-btn")?.classList.remove("d-none");
     } catch (error) {
         body.replaceChildren();
         const row = document.createElement("tr"); const cell = document.createElement("td");
         cell.colSpan = 6; cell.textContent = error.message; row.appendChild(cell); body.appendChild(row);
+    }
+}
+
+async function loadInstructorEvaluation(evaluationId) {
+    const panel = document.getElementById("instructor-review-details");
+    if (!panel) return;
+    panel.classList.remove("d-none");
+    panel.replaceChildren();
+    const status = document.createElement("p");
+    status.className = "text-muted";
+    status.textContent = "Loading shared evaluation…";
+    panel.appendChild(status);
+    try {
+        const { evaluation } = await apiRequest(`/ml/instructor/evaluations/${evaluationId}`);
+        panel.replaceChildren();
+        const title = document.createElement("h5");
+        title.textContent = `Run ${evaluation.id}: ${evaluation.model_name} · ${evaluation.algorithm}`;
+        panel.appendChild(title);
+        const owner = document.createElement("p");
+        owner.className = "text-muted small";
+        owner.textContent = `Shared by ${evaluation.owner} · ${evaluation.created_at || "Date unavailable"}`;
+        panel.appendChild(owner);
+
+        const metricHeading = document.createElement("h6");
+        metricHeading.textContent = "Performance metrics";
+        panel.appendChild(metricHeading);
+        const metricsTable = document.createElement("table");
+        metricsTable.className = "table table-sm table-bordered w-auto";
+        const metricsBody = document.createElement("tbody");
+        for (const [name, value] of Object.entries(evaluation.metrics || {})) {
+            const row = document.createElement("tr");
+            const label = document.createElement("th");
+            label.scope = "row";
+            label.textContent = name;
+            const result = document.createElement("td");
+            result.textContent = typeof value === "number" ? value.toFixed(4) : String(value ?? "—");
+            row.append(label, result);
+            metricsBody.appendChild(row);
+        }
+        metricsTable.appendChild(metricsBody);
+        panel.appendChild(metricsTable);
+
+        if (Array.isArray(evaluation.confusion_matrix)) {
+            const heading = document.createElement("h6");
+            heading.textContent = "Confusion matrix";
+            panel.appendChild(heading);
+            const matrixTable = document.createElement("table");
+            matrixTable.className = "table table-sm table-bordered w-auto";
+            const matrixHead = document.createElement("thead");
+            const headerRow = document.createElement("tr");
+            const corner = document.createElement("th");
+            corner.textContent = "Actual / predicted";
+            headerRow.appendChild(corner);
+            const columnCount = evaluation.confusion_matrix[0]?.length || 0;
+            for (let column = 0; column < columnCount; column += 1) {
+                const header = document.createElement("th");
+                header.scope = "col";
+                const classLabel = evaluation.confusion_matrix_labels?.[column];
+                header.textContent = `Predicted ${classLabel ?? column}`;
+                headerRow.appendChild(header);
+            }
+            matrixHead.appendChild(headerRow);
+            matrixTable.appendChild(matrixHead);
+            const matrixBody = document.createElement("tbody");
+            evaluation.confusion_matrix.forEach((values, index) => {
+                const row = document.createElement("tr");
+                const label = document.createElement("th");
+                label.scope = "row";
+                const classLabel = evaluation.confusion_matrix_labels?.[index];
+                label.textContent = `Actual ${classLabel ?? index}`;
+                row.appendChild(label);
+                values.forEach((value) => {
+                    const cell = document.createElement("td");
+                    cell.textContent = String(value);
+                    row.appendChild(cell);
+                });
+                matrixBody.appendChild(row);
+            });
+            matrixTable.appendChild(matrixBody);
+            panel.appendChild(matrixTable);
+        }
+        if (evaluation.report && typeof evaluation.report === "object") {
+            const reportHeading = document.createElement("h6");
+            reportHeading.textContent = "Classification report";
+            panel.appendChild(reportHeading);
+            const report = document.createElement("pre");
+            report.className = "small bg-light border rounded p-2";
+            report.textContent = JSON.stringify(evaluation.report, null, 2);
+            panel.appendChild(report);
+        }
+    } catch (error) {
+        panel.replaceChildren();
+        const message = document.createElement("p");
+        message.className = "alert alert-danger";
+        message.textContent = error.message;
+        panel.appendChild(message);
     }
 }
 
@@ -1346,7 +1472,9 @@ async function compareSelectedRuns() {
     const target = document.getElementById("comparison-results");
     if (selected.length < 2) { target.textContent = "Select at least two runs to compare."; return; }
     try {
-        const { evaluations } = await apiRequest("/ml/compare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ evaluation_ids: selected }) });
+        const instructor = document.getElementById("user-role-badge")?.textContent === "instructor";
+        const endpoint = instructor ? "/ml/instructor/compare" : "/ml/compare";
+        const { evaluations } = await apiRequest(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ evaluation_ids: selected }) });
         target.replaceChildren();
         const table = document.createElement("table"); table.className = "table table-bordered table-sm";
         const head = document.createElement("tr"); head.innerHTML = "<th>Metric</th>";
