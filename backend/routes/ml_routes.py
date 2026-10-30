@@ -1,11 +1,11 @@
 import math
 import os
+from io import BytesIO
 from numbers import Real
 from uuid import uuid4
 
 import pandas as pd
 from flask import Blueprint, current_app, g, jsonify, request, send_file
-from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from sqlalchemy.exc import SQLAlchemyError
@@ -24,6 +24,7 @@ from routes.auth_utils import (
     login_required,
     non_instructor_required,
     role_required,
+    log_activity,
     owned_evaluation_query,
     owned_model_query,
 )
@@ -215,6 +216,229 @@ def instructor_evaluation(evaluation_id):
                                    "owner": result.user.username}}), 200
 
 @ml_bp.route("/train", methods=["POST"])
+@non_instructor_required
+def train_model():
+    """Train a model on an owned dataset (US-18).
+
+    Expected JSON body
+    ------------------
+    {
+        "dataset_id":   <int>   -- required; must be owned by the current user
+        "algorithm":    <str>   -- one of ModelTrainer.SUPPORTED_ALGORITHMS
+        "task_type":    <str>   -- "classification" or "regression"
+        "target_column":<str>   -- column name in the dataset CSV
+        "model_name":   <str>   -- optional display name (defaults to algorithm)
+        "test_size":    <float> -- train/test split ratio (default 0.2)
+        "preprocessing":{...}   -- optional preprocessing config dict
+            "missing_values": "none"|"drop"|"mean"|"median"|"mode"|"constant"
+            "encoding":       "none"|"label"|"onehot"
+            "scaling":        "none"|"minmax"|"standard"
+    }
+
+    Returns
+    -------
+    201 JSON with model record including id and status "completed".
+    400 on validation / algorithm / incompatible-config errors.
+    404 when dataset_id is not found or not owned by the caller.
+    """
+    body = request.get_json(silent=True) or {}
+
+    # --- 1. Validate required fields ---
+    dataset_id = body.get("dataset_id")
+    algorithm = body.get("algorithm")
+    task_type = body.get("task_type")
+    target_column = body.get("target_column")
+
+    missing_fields = [
+        name for name, val in [
+            ("dataset_id", dataset_id),
+            ("algorithm", algorithm),
+            ("task_type", task_type),
+            ("target_column", target_column),
+        ]
+        if val is None or (isinstance(val, str) and not val.strip())
+    ]
+    if missing_fields:
+        return jsonify({
+            "error": f"Missing required field(s): {', '.join(missing_fields)}"
+        }), 400
+
+    # --- 2. Validate algorithm and task_type early (FR-4.1-IT-2) ---
+    algorithm = str(algorithm).strip()
+    task_type = str(task_type).strip().lower()
+    target_column = str(target_column).strip()
+    model_name = str(body.get("model_name") or algorithm).strip()
+
+    if algorithm not in ModelTrainer.SUPPORTED_ALGORITHMS:
+        return jsonify({
+            "error": (
+                f"Unsupported algorithm '{algorithm}'. "
+                f"Supported algorithms: {', '.join(ModelTrainer.SUPPORTED_ALGORITHMS)}"
+            )
+        }), 400
+
+    if task_type not in ("classification", "regression"):
+        return jsonify({
+            "error": (
+                f"Unsupported task_type '{task_type}'. "
+                "Accepted values are 'classification' or 'regression'."
+            )
+        }), 400
+
+    # Check algorithm / task_type compatibility
+    if (algorithm, task_type) not in ModelTrainer._ESTIMATOR_MAP:
+        return jsonify({
+            "error": (
+                f"Algorithm '{algorithm}' is not compatible with task type '{task_type}'. "
+                "For example, 'logistic_regression' supports classification only and "
+                "'linear_regression' supports regression only."
+            )
+        }), 400
+
+    # --- 3. Resolve dataset ownership (FR-4.2-IT-1 / security) ---
+    dataset = get_owned_dataset(dataset_id, g.current_user.id)
+    if dataset is None:
+        return jsonify({"error": "Dataset not found"}), 404
+
+    # --- 4. Load the CSV ---
+    try:
+        df = pd.read_csv(dataset.file_path)
+    except Exception as exc:
+        return jsonify({"error": f"Could not read dataset file: {exc}"}), 400
+
+    if target_column not in df.columns:
+        return jsonify({
+            "error": f"Target column '{target_column}' does not exist in the dataset."
+        }), 400
+
+    # --- 5. Preprocessing (optional) ---
+    preproc_config = body.get("preprocessing") or {}
+    if not isinstance(preproc_config, dict):
+        preproc_config = {}
+
+    # Normalise the preprocessing keys so callers can use either top-level
+    # or nested syntax.
+    preprocessing_summary = {}
+    try:
+        df_processed, preprocessing_summary = DataPreprocessor.preprocess(
+            df,
+            config={
+                "missing_values": preproc_config.get("missing_values", "none"),
+                "encoding":       preproc_config.get("encoding",       "none"),
+                "scaling":        preproc_config.get("scaling",        "none"),
+                "fill_value":     preproc_config.get("fill_value",     None),
+            },
+            target_column=target_column,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    # --- 6. Validate target column still exists after preprocessing ---
+    if target_column not in df_processed.columns:
+        return jsonify({
+            "error": (
+                f"Target column '{target_column}' was removed during preprocessing. "
+                "Check your encoding configuration."
+            )
+        }), 400
+
+    # --- 7. Train / test split ---
+    test_size = body.get("test_size", 0.2)
+    if isinstance(test_size, bool) or not isinstance(test_size, Real):
+        return jsonify({"error": "test_size must be a finite number greater than 0 and less than 1."}), 400
+    if not (0 < test_size < 1) or not math.isfinite(test_size):
+        return jsonify({"error": "test_size must be a finite number greater than 0 and less than 1."}), 400
+
+    X = df_processed.drop(columns=[target_column])
+    y = df_processed[target_column]
+
+    try:
+        X_train, X_test, y_train, y_test = DataPreprocessor.split(
+            X, y, test_size=test_size
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    # --- 8. Create the MLModel record in "training" state ---
+    config_snapshot = {
+        "algorithm":   algorithm,
+        "task_type":   task_type,
+        "target_column": target_column,
+        "test_size":   test_size,
+        "preprocessing": preprocessing_summary,
+        "train_rows":  int(len(X_train)),
+        "test_rows":   int(len(X_test)),
+        "feature_count": int(X.shape[1]),
+        "features":    list(X.columns),
+    }
+
+    ml_model = MLModel(
+        user_id=g.current_user.id,
+        dataset_id=dataset.id,
+        model_name=model_name,
+        algorithm=algorithm,
+        status="training",
+        config_json=config_snapshot,
+    )
+    db.session.add(ml_model)
+    db.session.commit()
+
+    # --- 9. Train ---
+    try:
+        trained_model = ModelTrainer.train(
+            algorithm_name=algorithm,
+            task_type=task_type,
+            X_train=X_train,
+            y_train=y_train,
+        )
+    except ValueError as exc:
+        ml_model.status = "failed"
+        db.session.commit()
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        ml_model.status = "failed"
+        db.session.commit()
+        return jsonify({"error": f"Training failed unexpectedly: {exc}"}), 500
+
+    # --- 10. Persist the model file ---
+    from flask import current_app
+    saved_models_folder = current_app.config.get("SAVED_MODELS_FOLDER", "saved_models")
+    model_filename = f"model_{ml_model.id}.joblib"
+    model_path = os.path.join(saved_models_folder, model_filename)
+    try:
+        ModelTrainer.save(trained_model, model_path)
+    except Exception as exc:
+        ml_model.status = "failed"
+        db.session.commit()
+        return jsonify({"error": f"Could not save model file: {exc}"}), 500
+
+    # --- 11. Mark as completed ---
+    ml_model.model_path = model_path
+    ml_model.status = "completed"
+    db.session.commit()
+
+    log_activity(
+        action="model_trained",
+        user_id=g.current_user.id,
+        details={
+            "model_id": ml_model.id,
+            "algorithm": algorithm,
+            "task_type": task_type,
+            "dataset_id": dataset.id,
+        },
+    )
+
+    return jsonify({
+        "message": "Model trained successfully.",
+        "model": _model_response(ml_model),
+        "split": {
+            "requested_test_size": test_size,
+            "train_rows": int(len(X_train)),
+            "test_rows": int(len(X_test)),
+        },
+    }), 201
+
+
 @ml_bp.route("/evaluate", methods=["POST"])
 @non_instructor_required
 def evaluate_model():

@@ -355,13 +355,15 @@ class DataPreprocessor:
             numeric_steps = [("imputer", SimpleImputer(strategy="median"))]
             if scale_numeric:
                 numeric_steps.append(("scaler", StandardScaler()))
-            transformers.append(("numeric", Pipeline(numeric_steps), numeric_columns))
+            numeric_indices = [list(X_train.columns).index(c) for c in numeric_columns]
+            transformers.append(("numeric", Pipeline(numeric_steps), numeric_indices))
         if categorical_columns:
             categorical_steps = Pipeline([
                 ("imputer", SimpleImputer(strategy="most_frequent")),
                 ("encoder", OneHotEncoder(handle_unknown="ignore")),
             ])
-            transformers.append(("categorical", categorical_steps, categorical_columns))
+            categorical_indices = [list(X_train.columns).index(c) for c in categorical_columns]
+            transformers.append(("categorical", categorical_steps, categorical_indices))
         if not transformers:
             raise ValueError("Select at least one usable feature column for training.")
         return Pipeline([

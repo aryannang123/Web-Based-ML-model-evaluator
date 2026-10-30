@@ -143,8 +143,11 @@ function setupEventListeners() {
             }
         });
     }
-    // TODO: US-16 - Split ratio range slider listener (Nidhi).
-    // TODO: US-18 - Train button listener (Aryan).
+
+    // US-16: Split ratio range slider listener - DONE (updateSplitDisplay)
+    // US-17: Algorithm selection - DONE (loadAlgorithmCatalog)
+    // US-18: Model training - DONE (trainModel & backend /train)
+    // US-19: Evaluation metrics & comparison - DONE (evaluateDataset)
 
     const logoutBtn = document.getElementById("logout-btn");
 
@@ -153,6 +156,109 @@ function setupEventListeners() {
     }
 
     console.log("Frontend architecture initialized.");
+}
+
+// US-18: Update training controls based on active dataset state.
+function updateTrainingControls(enabled) {
+    const targetSelect = document.getElementById("target-column-select");
+    const algorithmSelect = document.getElementById("algorithm-select");
+    const splitRange = document.getElementById("split-range");
+    const trainBtn = document.getElementById("train-btn");
+
+    if (targetSelect) targetSelect.disabled = !enabled;
+    if (algorithmSelect) algorithmSelect.disabled = !enabled;
+    if (splitRange) splitRange.disabled = !enabled;
+    if (trainBtn) trainBtn.disabled = !enabled;
+}
+
+// US-18: Show user feedback for model training operations.
+function showTrainFeedback(message, isSuccess = true) {
+    const feedback = document.getElementById("train-feedback");
+    if (!feedback) return;
+
+    feedback.classList.remove("d-none", "alert-success", "alert-danger", "alert-info");
+    feedback.classList.add(isSuccess ? "alert-success" : "alert-danger");
+    feedback.textContent = message;
+}
+
+// US-18: Train model on active dataset.
+async function trainModel(event) {
+    event.preventDefault();
+
+    if (!activeDatasetId) {
+        showTrainFeedback("Please upload a dataset first.", false);
+        return;
+    }
+
+    const targetSelect = document.getElementById("target-column-select");
+    const algorithmSelect = document.getElementById("algorithm-select");
+    const splitRange = document.getElementById("split-range");
+    const trainBtn = document.getElementById("train-btn");
+
+    const targetColumn = targetSelect?.value?.trim();
+    const algorithm = algorithmSelect?.value?.trim();
+    const testSize = splitRange ? parseFloat(splitRange.value) : 0.2;
+
+    if (!targetColumn) {
+        showTrainFeedback("Please select a target column.", false);
+        return;
+    }
+
+    if (!algorithm) {
+        showTrainFeedback("Please select an ML algorithm.", false);
+        return;
+    }
+
+    const selectedOption = algorithmSelect.options[algorithmSelect.selectedIndex];
+    const optgroup = selectedOption?.parentElement;
+    let taskType = "classification";
+    if (optgroup && optgroup.label && optgroup.label.toLowerCase().includes("regression")) {
+        taskType = "regression";
+    } else if (algorithm === "linear_regression") {
+        taskType = "regression";
+    }
+
+    if (trainBtn) {
+        trainBtn.disabled = true;
+        trainBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Training model…';
+    }
+
+    showTrainFeedback("Training model in progress, please wait…", true);
+    const feedback = document.getElementById("train-feedback");
+    if (feedback) {
+        feedback.className = "mt-3 alert alert-info py-2 small";
+    }
+
+    try {
+        const payload = {
+            dataset_id: parseInt(activeDatasetId, 10),
+            algorithm: algorithm,
+            task_type: taskType,
+            target_column: targetColumn,
+            test_size: testSize
+        };
+
+        const result = await apiRequest("/ml/train", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const modelInfo = result.model || {};
+        showTrainFeedback(
+            `Model trained successfully! (Model ID: ${modelInfo.id}, Algorithm: ${modelInfo.algorithm}, Status: ${modelInfo.status})`,
+            true
+        );
+    } catch (error) {
+        showTrainFeedback(error.message || "Model training failed. Please try again.", false);
+    } finally {
+        if (trainBtn) {
+            trainBtn.disabled = false;
+            trainBtn.innerHTML = '<i class="bi bi-play-circle me-1"></i>Train & Evaluate Model';
+        }
+    }
 }
 
 // US-14: Update preprocessing controls based on active dataset state.
@@ -315,6 +421,7 @@ function updateDatasetDisplay(dataset) {
     }
 
     updatePreprocessingControls(true);
+    updateTrainingControls(true);
 }
 
 // US-08 / US-11: Upload a new dataset or replace the active dataset.
@@ -673,6 +780,7 @@ async function restoreActiveDataset() {
 
         updateTargetColumnOptions([]);
         updatePreprocessingControls(false);
+        updateTrainingControls(false);
     }
 
     updateUploadButton();
