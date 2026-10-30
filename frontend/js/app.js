@@ -537,7 +537,7 @@ async function evaluateDataset(event) {
     try {
         const result = await apiRequest("/ml/evaluate", {
             method: "POST",
-            headers: {"Content-Type": "application/json"},
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 dataset_id: Number(activeDatasetId),
                 target_column: targetColumn,
@@ -563,37 +563,168 @@ function renderEvaluationMessage(message, isError = false) {
     container.appendChild(paragraph);
 }
 
+
 function renderEvaluationResult(result) {
     const container = document.getElementById("evaluation-container");
+
+    // Destroy the previous chart before replacing the results.
+    const oldCanvas = container.querySelector("#evaluation-chart");
+    if (oldCanvas && window.Chart) {
+        const oldChart = Chart.getChart(oldCanvas);
+        if (oldChart) oldChart.destroy();
+    }
+
     container.replaceChildren();
+
+    // Display train-test split information.
     const split = document.createElement("p");
-    split.className = "small text-muted";
-    split.textContent = `Training used ${result.split.train_rows} rows and testing used ${result.split.test_rows} rows.`;
+    split.className = "small text-muted mb-3";
+    split.textContent =
+        `Training used ${result.split.train_rows} rows and testing used ${result.split.test_rows} rows.`;
     container.appendChild(split);
 
-    const list = document.createElement("dl");
-    list.className = "row mb-0";
-    for (const [name, value] of Object.entries(result.metrics || {})) {
-        const term = document.createElement("dt");
-        term.className = "col-sm-6";
-        term.textContent = name.replaceAll("_", " ");
-        const detail = document.createElement("dd");
-        detail.className = "col-sm-6";
-        detail.textContent = typeof value === "number" ? value.toFixed(4) : String(value);
-        list.append(term, detail);
+    const metrics = result.metrics || {};
+
+    // Display evaluation metrics as cards.
+    const metricsRow = document.createElement("div");
+    metricsRow.className = "row g-3";
+
+    const metricLabels = {
+        accuracy: "Accuracy",
+        precision_weighted: "Precision",
+        recall_weighted: "Recall",
+        f1_weighted: "F1 Score",
+        rmse: "RMSE",
+        r2: "R²",
+        mse: "MSE"
+    };
+
+    for (const [name, value] of Object.entries(metrics)) {
+        const column = document.createElement("div");
+        column.className = "col-6 col-md-4";
+
+        const card = document.createElement("div");
+        card.className = "metric-card h-100";
+
+        const label = document.createElement("div");
+        label.className = "text-muted small mb-2";
+        label.textContent = metricLabels[name] || name.replaceAll("_", " ");
+
+        const metricValue = document.createElement("div");
+        metricValue.className = "metric-value";
+        metricValue.textContent =
+            typeof value === "number" ? value.toFixed(4) : String(value);
+
+        card.append(label, metricValue);
+        column.appendChild(card);
+        metricsRow.appendChild(column);
     }
-    container.appendChild(list);
+
+    container.appendChild(metricsRow);
+
+    // Create a chart for classification performance metrics.
+    const classificationMetrics = [
+        ["accuracy", "Accuracy"],
+        ["precision_weighted", "Precision"],
+        ["recall_weighted", "Recall"],
+        ["f1_weighted", "F1 Score"]
+    ];
+
+    const availableMetrics = classificationMetrics.filter(
+        ([key]) => typeof metrics[key] === "number"
+    );
+
+    if (availableMetrics.length > 0 && window.Chart) {
+        const heading = document.createElement("h6");
+        heading.className = "mt-4 mb-3";
+        heading.textContent = "Classification Performance Chart";
+        container.appendChild(heading);
+
+        const chartContainer = document.createElement("div");
+        chartContainer.style.position = "relative";
+        chartContainer.style.height = "280px";
+
+        const canvas = document.createElement("canvas");
+        canvas.id = "evaluation-chart";
+        canvas.setAttribute("aria-label", "Classification metrics bar chart");
+
+        chartContainer.appendChild(canvas);
+        container.appendChild(chartContainer);
+
+        new Chart(canvas, {
+            type: "bar",
+            data: {
+                labels: availableMetrics.map(([, label]) => label),
+                datasets: [{
+                    label: "Performance Score",
+                    data: availableMetrics.map(([key]) => metrics[key]),
+                    backgroundColor: [
+                        "rgba(13, 110, 253, 0.75)",
+                        "rgba(25, 135, 84, 0.75)",
+                        "rgba(255, 193, 7, 0.75)",
+                        "rgba(13, 202, 240, 0.75)"
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        min: 0,
+                        max: 1,
+                        title: {
+                            display: true,
+                            text: "Score"
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    } else if (!window.Chart && availableMetrics.length > 0) {
+        const warning = document.createElement("p");
+        warning.className = "text-warning small mt-3";
+        warning.textContent = "Chart.js could not be loaded. Metrics are still displayed above.";
+        container.appendChild(warning);
+    }
+
+    // Display confusion matrix for classification.
     if (Array.isArray(result.confusion_matrix) && result.confusion_matrix.length) {
-        const heading = document.createElement("h6"); heading.className = "mt-4"; heading.textContent = "Confusion Matrix"; container.appendChild(heading);
-        const table = document.createElement("table"); table.className = "table table-bordered table-sm confusion-matrix-table";
+        const heading = document.createElement("h6");
+        heading.className = "mt-4 mb-3";
+        heading.textContent = "Confusion Matrix";
+        container.appendChild(heading);
+
+        const table = document.createElement("table");
+        table.className =
+            "table table-bordered table-sm confusion-matrix-table";
+
         result.confusion_matrix.forEach((rowValues) => {
             const row = document.createElement("tr");
-            rowValues.forEach((value) => { const cell=document.createElement("td"); cell.textContent=String(value); row.appendChild(cell); });
+
+            rowValues.forEach((value) => {
+                const cell = document.createElement("td");
+                cell.textContent = String(value);
+                row.appendChild(cell);
+            });
+
             table.appendChild(row);
         });
+
         container.appendChild(table);
     }
-    if (result.evaluation_id) loadRunHistory();
+
+    // Refresh saved evaluation history.
+    if (result.evaluation_id) {
+        loadRunHistory();
+    }
 }
 
 async function loadDatasetPreview(datasetId) {
@@ -1192,7 +1323,7 @@ async function loadRunHistory() {
             const actions = row.cells[5];
             if (!readOnly) {
                 const share = document.createElement("button"); share.className = "btn btn-sm btn-outline-secondary me-1"; share.textContent = run.shared_with_instructors ? "Unshare" : "Share";
-                share.onclick = async () => { await apiRequest(`/ml/evaluations/${run.id}/sharing`, {method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({shared_with_instructors:!run.shared_with_instructors})}); loadRunHistory(); };
+                share.onclick = async () => { await apiRequest(`/ml/evaluations/${run.id}/sharing`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shared_with_instructors: !run.shared_with_instructors }) }); loadRunHistory(); };
                 actions.appendChild(share);
                 const modelId = run.model_id;
                 const modelLink = document.createElement("a"); modelLink.className = "btn btn-sm btn-outline-primary me-1"; modelLink.href = `/api/ml/models/${modelId}/download`; modelLink.textContent = "Model"; actions.appendChild(modelLink);
@@ -1215,15 +1346,15 @@ async function compareSelectedRuns() {
     const target = document.getElementById("comparison-results");
     if (selected.length < 2) { target.textContent = "Select at least two runs to compare."; return; }
     try {
-        const {evaluations} = await apiRequest("/ml/compare", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({evaluation_ids:selected})});
+        const { evaluations } = await apiRequest("/ml/compare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ evaluation_ids: selected }) });
         target.replaceChildren();
         const table = document.createElement("table"); table.className = "table table-bordered table-sm";
         const head = document.createElement("tr"); head.innerHTML = "<th>Metric</th>";
-        evaluations.forEach(run => { const th=document.createElement("th"); th.textContent=`Run ${run.id} · ${run.algorithm}`; head.appendChild(th); });
-        const thead=document.createElement("thead"); thead.appendChild(head); table.appendChild(thead);
-        const metrics=[...new Set(evaluations.flatMap(run=>Object.keys(run.metrics||{})))];
-        const tbody=document.createElement("tbody");
-        metrics.forEach(metric=>{const row=document.createElement("tr"); const name=document.createElement("th"); name.textContent=metric; row.appendChild(name); evaluations.forEach(run=>{const td=document.createElement("td"); td.textContent=run.metrics?.[metric] ?? "—"; row.appendChild(td);}); tbody.appendChild(row);});
+        evaluations.forEach(run => { const th = document.createElement("th"); th.textContent = `Run ${run.id} · ${run.algorithm}`; head.appendChild(th); });
+        const thead = document.createElement("thead"); thead.appendChild(head); table.appendChild(thead);
+        const metrics = [...new Set(evaluations.flatMap(run => Object.keys(run.metrics || {})))];
+        const tbody = document.createElement("tbody");
+        metrics.forEach(metric => { const row = document.createElement("tr"); const name = document.createElement("th"); name.textContent = metric; row.appendChild(name); evaluations.forEach(run => { const td = document.createElement("td"); td.textContent = run.metrics?.[metric] ?? "—"; row.appendChild(td); }); tbody.appendChild(row); });
         table.appendChild(tbody); target.appendChild(table);
-    } catch(error) { target.textContent=error.message; }
+    } catch (error) { target.textContent = error.message; }
 }
