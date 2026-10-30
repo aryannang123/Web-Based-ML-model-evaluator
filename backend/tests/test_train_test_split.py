@@ -202,5 +202,101 @@ class TestTrainTestSplit(unittest.TestCase):
         self.assertEqual(response.json["error"], "Dataset not found")
 
 
+    def test_us17_catalog_and_every_algorithm_task_pair_are_supported(self):
+        from ml.trainer import ModelTrainer
+        catalog = self.client.get("/api/ml/algorithms")
+        self.assertEqual(catalog.status_code, 200)
+        self.assertEqual({key: {item["id"] for item in value} for key, value in catalog.json.items()}, {
+            "classification": {"logistic_regression", "decision_tree", "random_forest", "knn"},
+            "regression": {"linear_regression", "decision_tree", "random_forest", "knn"},
+        })
+        for task, items in catalog.json.items():
+            for item in items:
+                with self.subTest(task=task, algorithm=item["id"]):
+                    self.assertIsNotNone(ModelTrainer.create_estimator(item["id"], task))
+        bad = self.evaluate(self.upload(), algorithm="linear_regression", task_type="classification")
+        self.assertEqual(bad.status_code, 400)
+
+    def test_us20_compare_and_download_artifacts_for_owner(self):
+        dataset_id = self.upload()
+        first, second = self.evaluate(dataset_id), self.evaluate(dataset_id, algorithm="random_forest")
+        self.assertEqual(first.status_code, 201, first.json)
+        self.assertEqual(second.status_code, 201, second.json)
+        compared = self.client.post("/api/ml/compare", json={"evaluation_ids": [first.json["evaluation_id"], second.json["evaluation_id"]]})
+        self.assertEqual(compared.status_code, 200, compared.json)
+        self.assertEqual(len(compared.json["evaluations"]), 2)
+        report = self.client.get(f"/api/ml/evaluations/{first.json['evaluation_id']}/report")
+        self.assertEqual(report.status_code, 200)
+        self.assertEqual(report.mimetype, "application/pdf")
+        model = self.client.get(f"/api/ml/models/{first.json['model_id']}/download")
+        self.assertEqual(model.status_code, 200)
+        self.assertTrue(model.data)
+
+    def test_us19a_instructor_sees_only_shared_runs_and_cannot_write(self):
+        dataset_id = self.upload()
+        run = self.evaluate(dataset_id)
+        private_run = self.evaluate(dataset_id, algorithm="random_forest")
+        self.assertEqual(run.status_code, 201, run.json)
+        self.assertEqual(private_run.status_code, 201, private_run.json)
+        evaluation_id = run.json["evaluation_id"]
+        self.assertEqual(self.client.patch(f"/api/ml/evaluations/{evaluation_id}/sharing", json={"shared_with_instructors": True}).status_code, 200)
+        self.user.role = "instructor"
+        db.session.commit()
+        review = self.client.get("/api/ml/instructor/evaluations")
+        self.assertEqual(review.status_code, 200, review.json)
+        self.assertEqual([item["id"] for item in review.json["evaluations"]], [evaluation_id])
+        self.assertEqual(self.client.get(f"/api/ml/instructor/evaluations/{private_run.json['evaluation_id']}").status_code, 404)
+        self.assertEqual(self.client.post("/api/ml/evaluate", json={"dataset_id": dataset_id}).status_code, 403)
+        upload = self.client.post("/api/dataset/upload", data={"file": (io.BytesIO(self.csv_rows(20)), "other.csv")}, content_type="multipart/form-data")
+        self.assertEqual(upload.status_code, 403)
+        self.assertEqual(self.client.post(f"/api/dataset/{dataset_id}/preprocess", json={}).status_code, 403)
+        self.assertEqual(self.client.patch(f"/api/ml/evaluations/{evaluation_id}/sharing", json={"shared_with_instructors": False}).status_code, 403)
+
+    def test_us17_all_supported_estimators_fit_for_their_task_type(self):
+        import pandas as pd
+        from ml.trainer import ModelTrainer
+        frame = pd.DataFrame({"numeric": list(range(40)), "category": ["a", "b"] * 20})
+        targets = {"classification": pd.Series(["yes", "no"] * 20), "regression": pd.Series([float(i * 2 + 1) for i in range(40)])}
+        for task, items in ModelTrainer.algorithms_for().items():
+            for item in items:
+                with self.subTest(task=task, algorithm=item["id"]):
+                    fitted = ModelTrainer.train(item["id"], task, frame.iloc[:32], targets[task].iloc[:32])
+                    self.assertEqual(len(fitted.predict(frame.iloc[32:])), 8)
+
+    def test_us20_comparison_rejects_invalid_and_missing_run_requests(self):
+        first = self.evaluate(self.upload())
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(self.client.post("/api/ml/compare", json={"evaluation_ids": [first.json["evaluation_id"]]}).status_code, 400)
+        self.assertEqual(self.client.post("/api/ml/compare", json={"evaluation_ids": [first.json["evaluation_id"], 999999]}).status_code, 404)
+
+    def test_us15_target_column_is_validated_and_bad_requests_do_not_save_runs(self):
+        dataset_id = self.upload()
+        before = EvaluationResult.query.count()
+        missing = self.evaluate(dataset_id, target_column="not_a_column")
+        self.assertEqual(missing.status_code, 400)
+        self.assertIn("target column", missing.json["error"].lower())
+        self.assertEqual(EvaluationResult.query.count(), before)
+
+    def test_us18_failed_training_does_not_remove_prior_successful_run(self):
+        dataset_id = self.upload()
+        first = self.evaluate(dataset_id)
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(self.evaluate(dataset_id, algorithm="unsupported").status_code, 400)
+        history = self.client.get("/api/ml/evaluations")
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual([item["id"] for item in history.json["evaluations"]], [first.json["evaluation_id"]])
+
+    def test_us20_comparison_rejects_mixed_classification_and_regression(self):
+        classification = self.evaluate(self.upload())
+        regression_csv = "feature,target\n" + "\n".join(f"{i},{i * 2 + 1}" for i in range(20)) + "\n"
+        uploaded = self.client.post("/api/dataset/upload", data={"file": (io.BytesIO(regression_csv.encode()), "regression.csv")}, content_type="multipart/form-data")
+        self.assertEqual(uploaded.status_code, 201)
+        regression = self.evaluate(uploaded.json["dataset_id"], algorithm="linear_regression", task_type="regression")
+        self.assertEqual(classification.status_code, 201)
+        self.assertEqual(regression.status_code, 201, regression.json)
+        response = self.client.post("/api/ml/compare", json={"evaluation_ids": [classification.json["evaluation_id"], regression.json["evaluation_id"]]})
+        self.assertEqual(response.status_code, 400)
+
+
 if __name__ == "__main__":
     unittest.main()
