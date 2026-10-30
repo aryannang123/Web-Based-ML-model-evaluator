@@ -60,6 +60,24 @@ def _evaluation_response(result):
     }
 
 
+def _instructor_evaluation_response(result):
+    """Return only the fields required for read-only instructor review."""
+    report = result.report_json or {}
+    aggregate_keys = {"accuracy", "macro avg", "weighted avg"}
+    return {
+        "id": result.id,
+        "model_id": result.model_id,
+        "model_name": result.model.model_name,
+        "algorithm": result.model.algorithm,
+        "metrics": result.metrics_json,
+        "confusion_matrix": result.confusion_matrix_json,
+        "confusion_matrix_labels": [key for key in report if key not in aggregate_keys],
+        "report": report or None,
+        "created_at": result.created_at.isoformat() if result.created_at else None,
+        "owner": result.user.username,
+    }
+
+
 @ml_bp.route("/algorithms", methods=["GET"])
 @login_required
 def get_algorithms():
@@ -69,7 +87,7 @@ def get_algorithms():
 
 
 @ml_bp.route("/models", methods=["GET"])
-@login_required
+@non_instructor_required
 def list_models():
     models = owned_model_query(g.current_user.id).order_by(
         MLModel.created_at.desc(), MLModel.id.desc()
@@ -78,7 +96,7 @@ def list_models():
 
 
 @ml_bp.route("/models/<int:model_id>", methods=["GET"])
-@login_required
+@non_instructor_required
 def get_model(model_id):
     model = get_owned_model(model_id, g.current_user.id)
     if model is None:
@@ -87,7 +105,7 @@ def get_model(model_id):
 
 
 @ml_bp.route("/evaluations", methods=["GET"])
-@login_required
+@non_instructor_required
 def list_evaluations():
     results = owned_evaluation_query(g.current_user.id).order_by(
         EvaluationResult.created_at.desc(), EvaluationResult.id.desc()
@@ -96,7 +114,7 @@ def list_evaluations():
 
 
 @ml_bp.route("/evaluations/<int:evaluation_id>", methods=["GET"])
-@login_required
+@non_instructor_required
 def get_evaluation(evaluation_id):
     result = get_owned_evaluation(evaluation_id, g.current_user.id)
     if result is None:
@@ -106,7 +124,7 @@ def get_evaluation(evaluation_id):
 
 
 @ml_bp.route("/compare", methods=["POST"])
-@login_required
+@non_instructor_required
 def compare_evaluations():
     payload = request.get_json(silent=True) if request.is_json else None
     ids = payload.get("evaluation_ids") if isinstance(payload, dict) else None
@@ -136,7 +154,7 @@ def _owned_artifact(model_id):
 
 
 @ml_bp.route("/models/<int:model_id>/download", methods=["GET"])
-@login_required
+@non_instructor_required
 def download_model(model_id):
     model, path = _owned_artifact(model_id)
     if model is None or path is None:
@@ -145,11 +163,9 @@ def download_model(model_id):
 
 
 @ml_bp.route("/evaluations/<int:evaluation_id>/report", methods=["GET"])
-@login_required
+@non_instructor_required
 def download_report(evaluation_id):
     result = get_owned_evaluation(evaluation_id, g.current_user.id)
-    if result is None and getattr(g.current_user, "role", "student") == "instructor":
-        result = EvaluationResult.query.filter_by(id=evaluation_id, shared_with_instructors=True).first()
     if result is None:
         return jsonify({"error": "Evaluation not found."}), 404
     output = BytesIO()
@@ -200,7 +216,7 @@ def instructor_evaluations():
                .filter(EvaluationResult.shared_with_instructors.is_(True))
                .order_by(EvaluationResult.created_at.desc(), EvaluationResult.id.desc()).all())
     return jsonify({"evaluations": [
-        {**_evaluation_response(item), "owner": item.user.username} for item in results
+        _instructor_evaluation_response(item) for item in results
     ]}), 200
 
 
@@ -212,8 +228,28 @@ def instructor_evaluation(evaluation_id):
                       EvaluationResult.shared_with_instructors.is_(True)).first())
     if result is None:
         return jsonify({"error": "Evaluation not found."}), 404
-    return jsonify({"evaluation": {**_evaluation_response(result),
-                                   "owner": result.user.username}}), 200
+    return jsonify({"evaluation": _instructor_evaluation_response(result)}), 200
+
+
+@ml_bp.route("/instructor/compare", methods=["POST"])
+@role_required("instructor")
+def compare_shared_evaluations():
+    payload = request.get_json(silent=True) if request.is_json else None
+    ids = payload.get("evaluation_ids") if isinstance(payload, dict) else None
+    valid_ids = isinstance(ids, list) and 2 <= len(ids) <= 10
+    if not valid_ids or any(type(item) is not int for item in ids) or len(set(ids)) != len(ids):
+        return jsonify({"error": "Select between 2 and 10 distinct evaluation IDs."}), 400
+    results = (EvaluationResult.query.join(MLModel).join(Dataset)
+               .filter(EvaluationResult.id.in_(ids),
+                       EvaluationResult.shared_with_instructors.is_(True)).all())
+    if len(results) != len(ids):
+        return jsonify({"error": "One or more shared evaluations were not found."}), 404
+    tasks = {(item.model.config_json or {}).get("task_type") for item in results}
+    if len(tasks) != 1:
+        return jsonify({"error": "Only shared evaluations for the same task type can be compared."}), 400
+    return jsonify({"evaluations": [
+        _instructor_evaluation_response(item) for item in results
+    ]}), 200
 
 @ml_bp.route("/train", methods=["POST"])
 @non_instructor_required
