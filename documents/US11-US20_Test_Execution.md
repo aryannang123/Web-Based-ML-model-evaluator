@@ -2,7 +2,7 @@
 
 **Project:** Web-Based ML Model Evaluator
 **Execution date:** 2026-10-31
-**Branch:** `US-19a` (local; not pushed)
+**Branch:** `US-19a` (PR #37 open against `main`)
 **Base revision:** `812bc73` (`origin/main`, merged US-19)
 **Scope:** Sprint 2 dataset, model pipeline, evaluation, comparison/export, run-history, and instructor-review tests.
 **Traceability:** `Corrected_Test_Plan.md`, sections 3.2–3.6; requirements FR-2.3, FR-2.4, FR-3.1–FR-3.3, FR-4.1–FR-4.4, FR-5.4, FR-6.1, FR-7.4 and FR-7.5.
@@ -72,4 +72,4 @@
 - Share runs from a separate Student account, sign in as an Instructor, review metrics/confusion matrix and compare shared runs; verify private runs, dataset/model/report access, and write actions are denied.
 - Record supported-browser and deployment/performance outcomes separately when those environments are available.
 
-No commit or push was performed for this execution.
+The US-19a implementation and test record are committed and pushed on `US-19a`; PR #37 is open for team-leader review.
