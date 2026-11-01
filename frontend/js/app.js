@@ -111,6 +111,9 @@ function setupEventListeners() {
     const targetSelect = document.getElementById("target-column-select");
     const targetFeedback = document.getElementById("target-column-feedback");
     const trainButton = document.getElementById("train-btn");
+    document.getElementById("task-type-select")?.addEventListener("change", () => {
+        if (trainButton) trainButton.disabled = !targetSelect?.value;
+    });
 
     if (targetSelect) {
         targetSelect.addEventListener("change", () => {
@@ -162,103 +165,15 @@ function setupEventListeners() {
 function updateTrainingControls(enabled) {
     const targetSelect = document.getElementById("target-column-select");
     const algorithmSelect = document.getElementById("algorithm-select");
+    const taskTypeSelect = document.getElementById("task-type-select");
     const splitRange = document.getElementById("split-range");
     const trainBtn = document.getElementById("train-btn");
 
     if (targetSelect) targetSelect.disabled = !enabled;
     if (algorithmSelect) algorithmSelect.disabled = !enabled;
+    if (taskTypeSelect) taskTypeSelect.disabled = !enabled;
     if (splitRange) splitRange.disabled = !enabled;
     if (trainBtn) trainBtn.disabled = !enabled;
-}
-
-// US-18: Show user feedback for model training operations.
-function showTrainFeedback(message, isSuccess = true) {
-    const feedback = document.getElementById("train-feedback");
-    if (!feedback) return;
-
-    feedback.classList.remove("d-none", "alert-success", "alert-danger", "alert-info");
-    feedback.classList.add(isSuccess ? "alert-success" : "alert-danger");
-    feedback.textContent = message;
-}
-
-// US-18: Train model on active dataset.
-async function trainModel(event) {
-    event.preventDefault();
-
-    if (!activeDatasetId) {
-        showTrainFeedback("Please upload a dataset first.", false);
-        return;
-    }
-
-    const targetSelect = document.getElementById("target-column-select");
-    const algorithmSelect = document.getElementById("algorithm-select");
-    const splitRange = document.getElementById("split-range");
-    const trainBtn = document.getElementById("train-btn");
-
-    const targetColumn = targetSelect?.value?.trim();
-    const algorithm = algorithmSelect?.value?.trim();
-    const testSize = splitRange ? parseFloat(splitRange.value) : 0.2;
-
-    if (!targetColumn) {
-        showTrainFeedback("Please select a target column.", false);
-        return;
-    }
-
-    if (!algorithm) {
-        showTrainFeedback("Please select an ML algorithm.", false);
-        return;
-    }
-
-    const selectedOption = algorithmSelect.options[algorithmSelect.selectedIndex];
-    const optgroup = selectedOption?.parentElement;
-    let taskType = "classification";
-    if (optgroup && optgroup.label && optgroup.label.toLowerCase().includes("regression")) {
-        taskType = "regression";
-    } else if (algorithm === "linear_regression") {
-        taskType = "regression";
-    }
-
-    if (trainBtn) {
-        trainBtn.disabled = true;
-        trainBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Training model…';
-    }
-
-    showTrainFeedback("Training model in progress, please wait…", true);
-    const feedback = document.getElementById("train-feedback");
-    if (feedback) {
-        feedback.className = "mt-3 alert alert-info py-2 small";
-    }
-
-    try {
-        const payload = {
-            dataset_id: parseInt(activeDatasetId, 10),
-            algorithm: algorithm,
-            task_type: taskType,
-            target_column: targetColumn,
-            test_size: testSize
-        };
-
-        const result = await apiRequest("/ml/train", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(payload)
-        });
-
-        const modelInfo = result.model || {};
-        showTrainFeedback(
-            `Model trained successfully! (Model ID: ${modelInfo.id}, Algorithm: ${modelInfo.algorithm}, Status: ${modelInfo.status})`,
-            true
-        );
-    } catch (error) {
-        showTrainFeedback(error.message || "Model training failed. Please try again.", false);
-    } finally {
-        if (trainBtn) {
-            trainBtn.disabled = false;
-            trainBtn.innerHTML = '<i class="bi bi-play-circle me-1"></i>Train & Evaluate Model';
-        }
-    }
 }
 
 // US-14: Update preprocessing controls based on active dataset state.
@@ -516,9 +431,10 @@ async function evaluateDataset(event) {
     const algorithmSelect = document.getElementById("algorithm-select");
     const algorithm = algorithmSelect.value;
     const selectedOption = algorithmSelect.selectedOptions[0];
-    const taskType = selectedOption?.parentElement?.label?.toLowerCase() === "regression"
+    const inferredTask = selectedOption?.parentElement?.label?.toLowerCase() === "regression"
         ? "regression"
         : "classification";
+    const taskType = document.getElementById("task-type-select")?.value || inferredTask;
     const feedback = document.getElementById("evaluation-container");
     const trainButton = document.getElementById("train-btn");
 
@@ -1355,10 +1271,16 @@ async function loadRunHistory() {
                 share.onclick = async () => { await apiRequest(`/ml/evaluations/${run.id}/sharing`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shared_with_instructors: !run.shared_with_instructors }) }); loadRunHistory(); };
                 actions.appendChild(share);
                 const modelId = run.model_id;
-                const modelLink = document.createElement("a"); modelLink.className = "btn btn-sm btn-outline-primary me-1"; modelLink.href = `/api/ml/models/${modelId}/download`; modelLink.textContent = "Model"; actions.appendChild(modelLink);
-            }
-            if (!readOnly) {
-                const report = document.createElement("a"); report.className = "btn btn-sm btn-outline-primary"; report.href = `/api/ml/evaluations/${run.id}/report`; report.textContent = "PDF"; actions.appendChild(report);
+                const modelDownload = document.createElement("button");
+                modelDownload.type = "button"; modelDownload.className = "btn btn-sm btn-outline-primary me-1";
+                modelDownload.textContent = "Model";
+                modelDownload.addEventListener("click", () => downloadFile(`/ml/models/${modelId}/download`, `model-${modelId}.joblib`));
+                actions.appendChild(modelDownload);
+                const reportDownload = document.createElement("button");
+                reportDownload.type = "button"; reportDownload.className = "btn btn-sm btn-outline-primary";
+                reportDownload.textContent = "PDF";
+                reportDownload.addEventListener("click", () => downloadFile(`/ml/evaluations/${run.id}/report`, `evaluation-${run.id}.pdf`));
+                actions.appendChild(reportDownload);
             }
             body.appendChild(row);
         }
@@ -1368,6 +1290,25 @@ async function loadRunHistory() {
         body.replaceChildren();
         const row = document.createElement("tr"); const cell = document.createElement("td");
         cell.colSpan = 6; cell.textContent = error.message; row.appendChild(cell); body.appendChild(row);
+    }
+}
+
+async function downloadFile(endpoint, filename) {
+    const target = document.getElementById("comparison-results");
+    try {
+        const response = await fetch(`${API_BASE}${endpoint}`, { credentials: "same-origin" });
+        if (!response.ok) {
+            const contentType = response.headers.get("content-type") || "";
+            const data = contentType.includes("application/json") ? await response.json() : {};
+            throw new Error(data.error || `Download failed (HTTP ${response.status}).`);
+        }
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement("a");
+        link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove();
+        URL.revokeObjectURL(url);
+        if (target) target.textContent = `${filename} downloaded.`;
+    } catch (error) {
+        if (target) target.textContent = error.message || `Could not download ${filename}.`;
     }
 }
 
@@ -1473,16 +1414,74 @@ async function compareSelectedRuns() {
     if (selected.length < 2) { target.textContent = "Select at least two runs to compare."; return; }
     try {
         const instructor = document.getElementById("user-role-badge")?.textContent === "instructor";
-        const endpoint = instructor ? "/ml/instructor/compare" : "/ml/compare";
-        const { evaluations } = await apiRequest(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ evaluation_ids: selected }) });
+        const options = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ evaluation_ids: selected }) };
+        const comparison = instructor
+            ? await apiRequest("/ml/instructor/compare", options)
+            : await apiRequest("/ml/compare", options);
+        const evaluations = comparison.evaluations || [];
         target.replaceChildren();
         const table = document.createElement("table"); table.className = "table table-bordered table-sm";
         const head = document.createElement("tr"); head.innerHTML = "<th>Metric</th>";
-        evaluations.forEach(run => { const th = document.createElement("th"); th.textContent = `Run ${run.id} · ${run.algorithm}`; head.appendChild(th); });
+        const modelRows = comparison.models || [];
+        const labels = modelRows.length
+            ? modelRows.map((model) => model.run_label || model.model_name)
+            : evaluations.map((run) => `Run ${run.id} · ${run.algorithm}`);
+        labels.forEach((label) => { const th = document.createElement("th"); th.textContent = label; head.appendChild(th); });
         const thead = document.createElement("thead"); thead.appendChild(head); table.appendChild(thead);
-        const metrics = [...new Set(evaluations.flatMap(run => Object.keys(run.metrics || {})))];
+        const metrics = comparison.metric_names || [...new Set(evaluations.flatMap(run => Object.keys(run.metrics || {})))];
         const tbody = document.createElement("tbody");
         metrics.forEach(metric => { const row = document.createElement("tr"); const name = document.createElement("th"); name.textContent = metric; row.appendChild(name); evaluations.forEach(run => { const td = document.createElement("td"); td.textContent = run.metrics?.[metric] ?? "—"; row.appendChild(td); }); tbody.appendChild(row); });
         table.appendChild(tbody); target.appendChild(table);
+
+        if (comparison.chart?.metrics && modelRows.length) {
+            const title = document.createElement("h6");
+            title.className = "mt-3";
+            title.textContent = `Metric comparison chart · ${comparison.task_type}`;
+            target.appendChild(title);
+            const palette = ["#0d6efd", "#198754", "#fd7e14", "#6f42c1", "#dc3545", "#20c997"];
+            const rowHeight = 22;
+            const metricHeight = 26 + modelRows.length * rowHeight;
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute("viewBox", `0 0 680 ${metrics.length * metricHeight + 8}`);
+            svg.setAttribute("role", "img");
+            svg.setAttribute("aria-label", `Comparison chart for ${comparison.task_type} metrics`);
+            svg.classList.add("w-100");
+            metrics.forEach((metric, metricIndex) => {
+                const y = metricIndex * metricHeight + 18;
+                const metricLabel = document.createElementNS(svg.namespaceURI, "text");
+                metricLabel.setAttribute("x", "0"); metricLabel.setAttribute("y", String(y));
+                metricLabel.textContent = metric.toUpperCase(); svg.appendChild(metricLabel);
+                const points = comparison.chart.metrics[metric] || [];
+                const values = points.map((point) => Number(point.value));
+                const max = Math.max(0.000001, ...values.map(Math.abs));
+                const baseline = 300;
+                const axis = document.createElementNS(svg.namespaceURI, "line");
+                axis.setAttribute("x1", String(baseline)); axis.setAttribute("x2", String(baseline));
+                axis.setAttribute("y1", String(y + 2)); axis.setAttribute("y2", String(y + modelRows.length * rowHeight + 4));
+                axis.setAttribute("stroke", "#6c757d"); svg.appendChild(axis);
+                points.forEach((point, index) => {
+                    const model = modelRows[index];
+                    const value = Number(point.value); const width = Math.max(1, Math.abs(value) / max * 170);
+                    const bar = document.createElementNS(svg.namespaceURI, "rect");
+                    bar.setAttribute("x", String(value < 0 ? baseline - width : baseline));
+                    bar.setAttribute("y", String(y + 7 + index * rowHeight));
+                    bar.setAttribute("width", String(width)); bar.setAttribute("height", "13");
+                    bar.setAttribute("fill", palette[index % palette.length]); svg.appendChild(bar);
+                    const valueLabel = document.createElementNS(svg.namespaceURI, "text");
+                    valueLabel.setAttribute("x", String(value < 0 ? Math.max(0, baseline - width - 48) : baseline + width + 5));
+                    valueLabel.setAttribute("y", String(y + 18 + index * rowHeight));
+                    valueLabel.textContent = value.toPrecision(4); svg.appendChild(valueLabel);
+                    const runLabel = document.createElementNS(svg.namespaceURI, "text");
+                    runLabel.setAttribute("x", "485"); runLabel.setAttribute("y", String(y + 18 + index * rowHeight));
+                    runLabel.textContent = `${model.run_label || model.model_name}`;
+                    svg.appendChild(runLabel);
+                });
+            });
+            target.appendChild(svg);
+            const limitation = document.createElement("p");
+            limitation.className = "small text-muted";
+            limitation.textContent = comparison.limitations || "Each value comes from the run's persisted evaluation.";
+            target.appendChild(limitation);
+        }
     } catch (error) { target.textContent = error.message; }
 }

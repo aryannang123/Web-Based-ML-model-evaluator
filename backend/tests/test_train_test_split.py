@@ -1,5 +1,6 @@
 import io
 import os
+import shutil
 import tempfile
 import unittest
 from uuid import uuid4
@@ -66,8 +67,7 @@ class TestTrainTestSplit(unittest.TestCase):
         db.session.commit()
         for folder in (self.app.config["UPLOAD_FOLDER"], self.app.config["SAVED_MODELS_FOLDER"]):
             if os.path.isdir(folder):
-                for name in os.listdir(folder):
-                    os.remove(os.path.join(folder, name))
+                shutil.rmtree(folder)
 
     @staticmethod
     def csv_rows(count):

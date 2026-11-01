@@ -148,6 +148,15 @@
                             </div>
 
                             <div class="mb-3">
+                                <label class="form-label small fw-semibold" for="task-type-select">Task Type</label>
+                                <select class="form-select" id="task-type-select" disabled>
+                                    <option value="">Infer from selected algorithm</option>
+                                    <option value="classification">Classification</option>
+                                    <option value="regression">Regression</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
                                 <label class="form-label small fw-semibold">ML Algorithm</label>
                                 <select class="form-select" id="algorithm-select" disabled required>
                                     <option value="">Choose an algorithm...</option>

@@ -1,3 +1,4 @@
+import hashlib
 import math
 import os
 from io import BytesIO
@@ -37,11 +38,15 @@ def _model_response(model):
     return {
         "id": model.id,
         "dataset_id": model.dataset_id,
+        "dataset_name": model.dataset.filename if model.dataset else None,
         "model_name": model.model_name,
         "algorithm": model.algorithm,
+        "run_label": f"{model.model_name} · Run #{model.id}",
         "status": model.status,
         "configuration": model.config_json,
         "created_at": model.created_at.isoformat() if model.created_at else None,
+        "evaluation_id": model.evaluations[-1].id if model.evaluations else None,
+        "metrics": model.evaluations[-1].metrics_json if model.evaluations else None,
     }
 
 
@@ -128,16 +133,82 @@ def get_evaluation(evaluation_id):
 def compare_evaluations():
     payload = request.get_json(silent=True) if request.is_json else None
     ids = payload.get("evaluation_ids") if isinstance(payload, dict) else None
+    id_kind = "evaluation_ids"
+    if ids is None and isinstance(payload, dict):
+        ids = payload.get("model_ids")
+        id_kind = "model_ids"
     valid_ids = isinstance(ids, list) and 2 <= len(ids) <= 10
     if not valid_ids or any(type(item) is not int for item in ids) or len(set(ids)) != len(ids):
-        return jsonify({"error": "Select between 2 and 10 distinct evaluation IDs."}), 400
-    results = owned_evaluation_query(g.current_user.id).filter(EvaluationResult.id.in_(ids)).all()
-    if len(results) != len(ids):
-        return jsonify({"error": "One or more evaluations were not found."}), 404
-    tasks = {(item.model.config_json or {}).get("task_type") for item in results}
-    if len(tasks) != 1:
-        return jsonify({"error": "Only evaluations for the same task type can be compared."}), 400
-    return jsonify({"evaluations": [_evaluation_response(item) for item in results]}), 200
+        return jsonify({"error": "Select between 2 and 10 distinct model or evaluation IDs."}), 400
+
+    if id_kind == "model_ids":
+        found = owned_model_query(g.current_user.id).filter(MLModel.id.in_(ids)).all()
+        if len(found) != len(ids):
+            return jsonify({"error": "One or more model runs were not found."}), 404
+        models_by_id = {item.id: item for item in found}
+        models = [models_by_id[item] for item in ids]
+        evaluations = [
+            max(model.evaluations, key=lambda item: item.id) if model.evaluations else None
+            for model in models
+        ]
+    else:
+        found = owned_evaluation_query(g.current_user.id).filter(EvaluationResult.id.in_(ids)).all()
+        if len(found) != len(ids):
+            return jsonify({"error": "One or more evaluations were not found."}), 404
+        evaluations_by_id = {item.id: item for item in found}
+        evaluations = [evaluations_by_id[item] for item in ids]
+        models = [item.model for item in evaluations]
+
+    if any(item is None for item in evaluations):
+        return jsonify({"error": "An evaluation result is unavailable for one or more runs."}), 409
+
+    configs = [model.config_json or {} for model in models]
+    tasks = [config.get("task_type") for config in configs]
+    if tasks[0] not in ("classification", "regression") or any(task != tasks[0] for task in tasks):
+        return jsonify({"error": "Classification and regression runs cannot be compared together."}), 400
+    compatibility_keys = ("target_column", "test_size", "random_state", "preprocessing", "dataset_fingerprint")
+    if any(model.dataset_id != models[0].dataset_id for model in models) or any(
+        any(config.get(key) != configs[0].get(key) for key in compatibility_keys)
+        for config in configs[1:]
+    ):
+        return jsonify({"error": "Runs must use the same dataset, target, split, seed, and preprocessing settings."}), 400
+
+    metric_names = (
+        ("accuracy", "precision", "recall", "f1")
+        if tasks[0] == "classification" else ("mae", "mse", "rmse", "r2")
+    )
+    metric_points = {}
+    for name in metric_names:
+        points = []
+        for model, evaluation in zip(models, evaluations):
+            value = (evaluation.metrics_json or {}).get(name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                return jsonify({"error": "A comparable persisted metric is unavailable for one or more runs."}), 409
+            points.append({
+                "model_id": model.id,
+                "evaluation_id": evaluation.id,
+                "model_name": model.model_name,
+                "run_label": f"{model.model_name} · Run #{model.id}",
+                "value": value,
+            })
+        metric_points[name] = points
+
+    model_rows = []
+    for model, evaluation in zip(models, evaluations):
+        row = _model_response(model)
+        row.update({"evaluation_id": evaluation.id, "metrics": evaluation.metrics_json})
+        model_rows.append(row)
+    evaluation_rows = [_evaluation_response(item) for item in evaluations]
+    return jsonify({
+        "task_type": tasks[0],
+        "dataset_id": models[0].dataset_id,
+        "dataset_name": models[0].dataset.filename if models[0].dataset else None,
+        "models": model_rows,
+        "evaluations": evaluation_rows,
+        "metric_names": list(metric_names),
+        "chart": {"labels": [item["run_label"] for item in model_rows], "metrics": metric_points},
+        "limitations": "Metrics use each run's persisted held-out evaluation split.",
+    }), 200
 
 
 def _owned_artifact(model_id):
@@ -150,7 +221,17 @@ def _owned_artifact(model_id):
         safe = os.path.commonpath([folder, path]) == folder
     except ValueError:
         safe = False
-    return model, path if safe and os.path.isfile(path) else None
+    if not safe or not os.path.isfile(path):
+        return model, None
+    return model, path
+
+
+def _sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as artifact:
+        for chunk in iter(lambda: artifact.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 @ml_bp.route("/models/<int:model_id>/download", methods=["GET"])
@@ -159,6 +240,15 @@ def download_model(model_id):
     model, path = _owned_artifact(model_id)
     if model is None or path is None:
         return jsonify({"error": "Model artifact not found."}), 404
+    if os.path.getsize(path) == 0:
+        return jsonify({"error": "The saved model artifact is corrupted."}), 500
+    expected_hash = (model.config_json or {}).get("artifact_sha256")
+    if expected_hash:
+        try:
+            if _sha256_file(path) != expected_hash:
+                return jsonify({"error": "The saved model artifact is corrupted."}), 500
+        except OSError:
+            return jsonify({"error": "The saved model artifact could not be read."}), 500
     return send_file(path, as_attachment=True, download_name=f"model-{model.id}-{model.algorithm}.joblib")
 
 
@@ -169,7 +259,7 @@ def download_report(evaluation_id):
     if result is None:
         return jsonify({"error": "Evaluation not found."}), 404
     output = BytesIO()
-    pdf = canvas.Canvas(output, pagesize=letter)
+    pdf = canvas.Canvas(output, pagesize=letter, pageCompression=0)
     width, height = letter
     y = height - 54
     pdf.setTitle(f"Evaluation report {result.id}")
@@ -177,10 +267,18 @@ def download_report(evaluation_id):
     pdf.drawString(48, y, "ML Model Evaluation Report")
     y -= 30
     pdf.setFont("Helvetica", 10)
-    lines = [f"Run ID: {result.id}", f"Model: {result.model.model_name}",
-             f"Algorithm: {result.model.algorithm}", f"Created: {result.created_at}"]
-    lines.extend(f"{key}: {value}" for key, value in (result.model.config_json or {}).items())
+    config = result.model.config_json or {}
+    lines = [
+        f"Run ID: {result.id}", f"Model: {result.model.model_name}",
+        f"Algorithm: {result.model.algorithm}",
+        f"Dataset: {result.model.dataset.filename if result.model.dataset else 'Unavailable'}",
+        f"Task type: {config.get('task_type', 'Unavailable')}",
+        f"Target: {config.get('target_column', 'Unavailable')}",
+        f"Train/test split: {config.get('train_size', 'Unavailable')} / {config.get('test_size', 'Unavailable')}",
+        f"Created: {result.created_at}", "Evaluation metrics:",
+    ]
     lines.extend(f"{key}: {value}" for key, value in (result.metrics_json or {}).items())
+    lines.append("Limitations: Metrics reflect this run's persisted held-out evaluation split.")
     for line in lines:
         if y < 48:
             pdf.showPage()
@@ -244,6 +342,8 @@ def compare_shared_evaluations():
                        EvaluationResult.shared_with_instructors.is_(True)).all())
     if len(results) != len(ids):
         return jsonify({"error": "One or more shared evaluations were not found."}), 404
+    by_id = {item.id: item for item in results}
+    results = [by_id[item] for item in ids]
     tasks = {(item.model.config_json or {}).get("task_type") for item in results}
     if len(tasks) != 1:
         return jsonify({"error": "Only shared evaluations for the same task type can be compared."}), 400
@@ -251,326 +351,106 @@ def compare_shared_evaluations():
         _instructor_evaluation_response(item) for item in results
     ]}), 200
 
-@ml_bp.route("/train", methods=["POST"])
-@non_instructor_required
-def train_model():
-    """Train a model on an owned dataset (US-18).
 
-    Expected JSON body
-    ------------------
-    {
-        "dataset_id":   <int>   -- required; must be owned by the current user
-        "algorithm":    <str>   -- one of ModelTrainer.SUPPORTED_ALGORITHMS
-        "task_type":    <str>   -- "classification" or "regression"
-        "target_column":<str>   -- column name in the dataset CSV
-        "model_name":   <str>   -- optional display name (defaults to algorithm)
-        "test_size":    <float> -- train/test split ratio (default 0.2)
-        "preprocessing":{...}   -- optional preprocessing config dict
-            "missing_values": "none"|"drop"|"mean"|"median"|"mode"|"constant"
-            "encoding":       "none"|"label"|"onehot"
-            "scaling":        "none"|"minmax"|"standard"
-    }
-
-    Returns
-    -------
-    201 JSON with model record including id and status "completed".
-    400 on validation / algorithm / incompatible-config errors.
-    404 when dataset_id is not found or not owned by the caller.
-    """
-    body = request.get_json(silent=True) or {}
-
-    # --- 1. Validate required fields ---
-    dataset_id = body.get("dataset_id")
-    algorithm = body.get("algorithm")
-    task_type = body.get("task_type")
-    target_column = body.get("target_column")
-
-    missing_fields = [
-        name for name, val in [
-            ("dataset_id", dataset_id),
-            ("algorithm", algorithm),
-            ("task_type", task_type),
-            ("target_column", target_column),
-        ]
-        if val is None or (isinstance(val, str) and not val.strip())
-    ]
-    if missing_fields:
-        return jsonify({
-            "error": f"Missing required field(s): {', '.join(missing_fields)}"
-        }), 400
-
-    # --- 2. Validate algorithm and task_type early (FR-4.1-IT-2) ---
-    algorithm = str(algorithm).strip()
-    task_type = str(task_type).strip().lower()
-    target_column = str(target_column).strip()
-    model_name = str(body.get("model_name") or algorithm).strip()
-
-    if algorithm not in ModelTrainer.SUPPORTED_ALGORITHMS:
-        return jsonify({
-            "error": (
-                f"Unsupported algorithm '{algorithm}'. "
-                f"Supported algorithms: {', '.join(ModelTrainer.SUPPORTED_ALGORITHMS)}"
-            )
-        }), 400
-
-    if task_type not in ("classification", "regression"):
-        return jsonify({
-            "error": (
-                f"Unsupported task_type '{task_type}'. "
-                "Accepted values are 'classification' or 'regression'."
-            )
-        }), 400
-
-    # Check algorithm / task_type compatibility
-    if (algorithm, task_type) not in ModelTrainer._ESTIMATOR_MAP:
-        return jsonify({
-            "error": (
-                f"Algorithm '{algorithm}' is not compatible with task type '{task_type}'. "
-                "For example, 'logistic_regression' supports classification only and "
-                "'linear_regression' supports regression only."
-            )
-        }), 400
-
-    # --- 3. Resolve dataset ownership (FR-4.2-IT-1 / security) ---
-    dataset = get_owned_dataset(dataset_id, g.current_user.id)
-    if dataset is None:
-        return jsonify({"error": "Dataset not found"}), 404
-
-    # --- 4. Load the CSV ---
-    try:
-        df = pd.read_csv(dataset.file_path)
-    except Exception as exc:
-        return jsonify({"error": f"Could not read dataset file: {exc}"}), 400
-
-    if target_column not in df.columns:
-        return jsonify({
-            "error": f"Target column '{target_column}' does not exist in the dataset."
-        }), 400
-
-    # --- 5. Preprocessing (optional) ---
-    preproc_config = body.get("preprocessing") or {}
-    if not isinstance(preproc_config, dict):
-        preproc_config = {}
-
-    # Normalise the preprocessing keys so callers can use either top-level
-    # or nested syntax.
-    preprocessing_summary = {}
-    try:
-        df_processed, preprocessing_summary = DataPreprocessor.preprocess(
-            df,
-            config={
-                "missing_values": preproc_config.get("missing_values", "none"),
-                "encoding":       preproc_config.get("encoding",       "none"),
-                "scaling":        preproc_config.get("scaling",        "none"),
-                "fill_value":     preproc_config.get("fill_value",     None),
-            },
-            target_column=target_column,
-        )
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-
-    # --- 6. Validate target column still exists after preprocessing ---
-    if target_column not in df_processed.columns:
-        return jsonify({
-            "error": (
-                f"Target column '{target_column}' was removed during preprocessing. "
-                "Check your encoding configuration."
-            )
-        }), 400
-
-    # --- 7. Train / test split ---
-    test_size = body.get("test_size", 0.2)
-    if isinstance(test_size, bool) or not isinstance(test_size, Real):
-        return jsonify({"error": "test_size must be a finite number greater than 0 and less than 1."}), 400
-    if not (0 < test_size < 1) or not math.isfinite(test_size):
-        return jsonify({"error": "test_size must be a finite number greater than 0 and less than 1."}), 400
-
-    X = df_processed.drop(columns=[target_column])
-    y = df_processed[target_column]
-
-    try:
-        X_train, X_test, y_train, y_test = DataPreprocessor.split(
-            X, y, test_size=test_size
-        )
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-
-    # --- 8. Create the MLModel record in "training" state ---
-    config_snapshot = {
-        "algorithm":   algorithm,
-        "task_type":   task_type,
-        "target_column": target_column,
-        "test_size":   test_size,
-        "preprocessing": preprocessing_summary,
-        "train_rows":  int(len(X_train)),
-        "test_rows":   int(len(X_test)),
-        "feature_count": int(X.shape[1]),
-        "features":    list(X.columns),
-    }
-
-    ml_model = MLModel(
-        user_id=g.current_user.id,
-        dataset_id=dataset.id,
-        model_name=model_name,
-        algorithm=algorithm,
-        status="training",
-        config_json=config_snapshot,
-    )
-    db.session.add(ml_model)
-    db.session.commit()
-
-    # --- 9. Train ---
-    try:
-        trained_model = ModelTrainer.train(
-            algorithm_name=algorithm,
-            task_type=task_type,
-            X_train=X_train,
-            y_train=y_train,
-        )
-    except ValueError as exc:
-        ml_model.status = "failed"
-        db.session.commit()
-        return jsonify({"error": str(exc)}), 400
-    except Exception as exc:
-        ml_model.status = "failed"
-        db.session.commit()
-        return jsonify({"error": f"Training failed unexpectedly: {exc}"}), 500
-
-    # --- 10. Persist the model file ---
-    from flask import current_app
-    saved_models_folder = current_app.config.get("SAVED_MODELS_FOLDER", "saved_models")
-    model_filename = f"model_{ml_model.id}.joblib"
-    model_path = os.path.join(saved_models_folder, model_filename)
-    try:
-        ModelTrainer.save(trained_model, model_path)
-    except Exception as exc:
-        ml_model.status = "failed"
-        db.session.commit()
-        return jsonify({"error": f"Could not save model file: {exc}"}), 500
-
-    # --- 11. Mark as completed ---
-    ml_model.model_path = model_path
-    ml_model.status = "completed"
-    db.session.commit()
-
-    log_activity(
-        action="model_trained",
-        user_id=g.current_user.id,
-        details={
-            "model_id": ml_model.id,
-            "algorithm": algorithm,
-            "task_type": task_type,
-            "dataset_id": dataset.id,
-        },
-    )
-
-    return jsonify({
-        "message": "Model trained successfully.",
-        "model": _model_response(ml_model),
-        "split": {
-            "requested_test_size": test_size,
-            "train_rows": int(len(X_train)),
-            "test_rows": int(len(X_test)),
-        },
-    }), 201
-
-
-@ml_bp.route("/evaluate", methods=["POST"])
-@non_instructor_required
-def evaluate_model():
-    if not request.is_json:
-        return jsonify({"error": "A JSON request body is required."}), 400
-    payload = request.get_json(silent=True)
-    if not isinstance(payload, dict):
+def _train_and_persist(body):
+    """Shared training/evaluation path for both public training endpoints."""
+    if not isinstance(body, dict):
         return jsonify({"error": "A valid JSON object is required."}), 400
 
-    dataset_id = payload.get("dataset_id")
+    dataset_id = body.get("dataset_id")
+    target = body.get("target_column")
+    algorithm = body.get("algorithm")
+    task = body.get("task_type")
     if isinstance(dataset_id, bool) or not isinstance(dataset_id, int):
         return jsonify({"error": "dataset_id must be an integer."}), 400
-    dataset = get_owned_dataset(dataset_id, g.current_user.id)
-    if dataset is None:
-        return jsonify({"error": "Dataset not found"}), 404
-
-    test_size = payload.get("test_size", 0.2)
-    if isinstance(test_size, bool) or not isinstance(test_size, Real):
-        return jsonify({
-            "error": "test_size must be a finite number greater than 0 and less than 1."
-        }), 400
-    test_size = float(test_size)
-    if not math.isfinite(test_size) or not 0 < test_size < 1:
-        return jsonify({
-            "error": "test_size must be a finite number greater than 0 and less than 1."
-        }), 400
-
-    target_column = payload.get("target_column")
-    if not isinstance(target_column, str) or not target_column:
+    if not isinstance(target, str) or not target.strip():
         return jsonify({"error": "Choose a target column."}), 400
-    algorithm = payload.get("algorithm")
-    if not isinstance(algorithm, str):
+    if not isinstance(algorithm, str) or not algorithm.strip():
         return jsonify({"error": "Choose a supported algorithm."}), 400
-    task_type = payload.get("task_type")
-    if task_type is None:
-        task_type = {
-            "logistic_regression": "classification",
-            "linear_regression": "regression",
-        }.get(algorithm)
-    if not isinstance(task_type, str) or task_type not in {"classification", "regression"}:
+    target, algorithm = target.strip(), algorithm.strip()
+    if task not in ("classification", "regression"):
         return jsonify({"error": "Choose a classification or regression task."}), 400
-
-    if algorithm == "logistic_regression" and task_type != "classification":
-        return jsonify({"error": "Logistic regression requires a classification target."}), 400
-    if algorithm == "linear_regression" and task_type != "regression":
-        return jsonify({"error": "Linear regression requires a numeric regression target."}), 400
     try:
-        ModelTrainer.create_estimator(algorithm, task_type)
+        ModelTrainer.create_estimator(algorithm, task)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    upload_folder = os.path.realpath(current_app.config["UPLOAD_FOLDER"])
-    stored_path = os.path.realpath(dataset.file_path)
+    dataset = get_owned_dataset(dataset_id, g.current_user.id)
+    if dataset is None:
+        return jsonify({"error": "Dataset not found"}), 404
+    upload_root = os.path.realpath(current_app.config["UPLOAD_FOLDER"])
+    source_path = os.path.realpath(dataset.file_path)
     try:
-        is_in_upload_folder = os.path.commonpath([upload_folder, stored_path]) == upload_folder
+        safe_source = os.path.commonpath([upload_root, source_path]) == upload_root
     except ValueError:
-        is_in_upload_folder = False
-    if not is_in_upload_folder or not os.path.isfile(stored_path):
+        safe_source = False
+    if not safe_source or not os.path.isfile(source_path):
         return jsonify({"error": "The dataset file is missing or unavailable."}), 404
+
     try:
-        frame = pd.read_csv(stored_path)
+        with open(source_path, "rb") as source_file:
+            dataset_fingerprint = hashlib.sha256(source_file.read()).hexdigest()
+        frame = pd.read_csv(source_path)
     except (OSError, PermissionError):
         return jsonify({"error": "The dataset file could not be read."}), 500
     except (pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeDecodeError, ValueError):
         return jsonify({"error": "The dataset CSV is malformed or unreadable."}), 400
+    if target not in frame.columns:
+        return jsonify({"error": f"Target column '{target}' was not found in the dataset."}), 400
 
-    if target_column not in frame.columns:
-        return jsonify({"error": "The selected target column was not found in the dataset."}), 400
-    frame = frame.dropna(subset=[target_column]).dropna(axis=1, how="all")
-    if target_column not in frame.columns:
-        return jsonify({"error": "The selected target column has no usable values."}), 400
-    X = frame.drop(columns=[target_column])
-    y = frame[target_column]
-    if X.shape[1] == 0:
-        return jsonify({"error": "At least one feature column is required."}), 400
-    if task_type == "regression":
+    preprocessing = body.get("preprocessing") or {}
+    if not isinstance(preprocessing, dict):
+        return jsonify({"error": "preprocessing must be an object."}), 400
+    preprocessing_config = {
+        "missing_values": preprocessing.get("missing_values", "none"),
+        "encoding": preprocessing.get("encoding", "none"),
+        "scaling": preprocessing.get("scaling", "none"),
+        "fill_value": preprocessing.get("fill_value"),
+    }
+    try:
+        frame, preprocessing_summary = DataPreprocessor.preprocess(
+            frame, config=preprocessing_config, target_column=target
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if target not in frame.columns:
+        return jsonify({"error": "The target column was removed during preprocessing."}), 400
+    frame = frame.dropna(subset=[target]).dropna(axis=1, how="all")
+    X = frame.drop(columns=[target])
+    y = frame[target]
+    if task == "regression":
         y = pd.to_numeric(y, errors="coerce")
         usable = y.notna()
         X, y = X.loc[usable], y.loc[usable]
     else:
         y = y.astype(str)
+    if X.shape[1] == 0:
+        return jsonify({"error": "At least one feature column is required."}), 400
     if len(y) < 2:
         return jsonify({"error": "At least 2 usable samples are required for training and testing."}), 400
 
-    stratify = y if task_type == "classification" else None
-    if stratify is not None and y.value_counts().min() < 2:
-        return jsonify({
-            "error": "Each target class needs at least 2 samples for a stratified split."
-        }), 400
+    test_size = body.get("test_size", 0.2)
+    if isinstance(test_size, bool) or not isinstance(test_size, Real):
+        return jsonify({"error": "test_size must be a finite number greater than 0 and less than 1."}), 400
+    test_size = float(test_size)
+    if not math.isfinite(test_size) or not 0 < test_size < 1:
+        return jsonify({"error": "test_size must be a finite number greater than 0 and less than 1."}), 400
+    random_state = body.get("random_state", 42)
+    if isinstance(random_state, bool) or not isinstance(random_state, int):
+        return jsonify({"error": "random_state must be an integer."}), 400
+
+    stratify = None
+    if task == "classification":
+        counts = y.value_counts()
+        if counts.min() < 2:
+            return jsonify({"error": "Each target class needs at least 2 samples for a stratified split."}), 400
+        stratify = y
     try:
         X_train, X_test, y_train, y_test = DataPreprocessor.split(
-            X, y, test_size=test_size, random_state=42, stratify=stratify
+            X, y, test_size=test_size, random_state=random_state, stratify=stratify
         )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
-
     minimum_train_count = 5 if algorithm == "knn" else 2
     if len(X_train) < minimum_train_count:
         return jsonify({
@@ -581,47 +461,71 @@ def evaluate_model():
             )
         }), 400
     if algorithm == "logistic_regression" and y_train.value_counts().min() < 2:
-        return jsonify({
-            "error": "Logistic regression needs at least 2 training samples from every target class."
-        }), 400
-
+        return jsonify({"error": "Logistic regression needs at least 2 training samples from every target class."}), 400
     try:
-        fitted_model = ModelTrainer.train(algorithm, task_type, X_train, y_train)
-        metrics, confusion, report = ModelEvaluator.evaluate(
-            fitted_model, X_test, y_test, task_type
-        )
+        fitted_model = ModelTrainer.train(algorithm, task, X_train, y_train)
+        metrics, confusion, report = ModelEvaluator.evaluate(fitted_model, X_test, y_test, task)
     except (ValueError, TypeError) as exc:
         return jsonify({"error": f"The model could not be trained with this data: {exc}"}), 400
+    except Exception:
+        current_app.logger.exception("Model training failed")
+        return jsonify({"error": "Training failed. Check the data and selected options."}), 500
 
-    split_summary = {
-        "train_rows": len(X_train),
-        "test_rows": len(X_test),
-        "train_fraction": len(X_train) / len(X),
-        "test_fraction": len(X_test) / len(X),
-        "requested_test_size": test_size,
-    }
     model_path = None
     try:
-        model_folder = os.path.abspath(current_app.config["SAVED_MODELS_FOLDER"])
-        os.makedirs(model_folder, exist_ok=True)
-        model_path = os.path.join(model_folder, f"{uuid4().hex}.joblib")
-        if os.path.commonpath([model_folder, os.path.abspath(model_path)]) != model_folder:
+        model_root = os.path.realpath(current_app.config["SAVED_MODELS_FOLDER"])
+        user_folder = os.path.join(model_root, str(g.current_user.id))
+        os.makedirs(user_folder, mode=0o700, exist_ok=True)
+        os.chmod(user_folder, 0o700)
+        model_path = os.path.abspath(os.path.join(user_folder, f"{uuid4().hex}.joblib"))
+        if os.path.commonpath([model_root, model_path]) != model_root:
             return jsonify({"error": "Unable to safely save the trained model."}), 500
         ModelTrainer.save(fitted_model, model_path)
+        os.chmod(model_path, 0o600)
+        artifact_sha256 = _sha256_file(model_path)
+        split_summary = {
+            "train_rows": int(len(X_train)),
+            "test_rows": int(len(X_test)),
+            "train_fraction": len(X_train) / len(X),
+            "test_fraction": len(X_test) / len(X),
+            "requested_test_size": test_size,
+        }
+        config = {
+            "algorithm": algorithm,
+            "task_type": task,
+            "target_column": target,
+            "test_size": test_size,
+            "train_size": len(X_train) / len(X),
+            "random_state": random_state,
+            "preprocessing": {
+                **preprocessing_config,
+                "summary": preprocessing_summary,
+                "dataset_preprocessing": (dataset.metadata_json or {}).get("last_preprocessing"),
+                "numeric": "median imputation",
+                "categorical": "most frequent imputation and one-hot encoding",
+            },
+            "train_rows": int(len(X_train)),
+            "test_rows": int(len(X_test)),
+            "feature_count": int(X.shape[1]),
+            "features": [str(column) for column in X.columns],
+            "feature_columns": [str(column) for column in X.columns],
+            "dataset_filename": dataset.filename,
+            "row_count": int(len(frame)),
+            "dataset_fingerprint": dataset_fingerprint,
+            "artifact_sha256": artifact_sha256,
+            **split_summary,
+        }
+        model_name = str(body.get("model_name") or f"{algorithm.replace('_', ' ').title()} - {task.title()}").strip()
+        if not model_name:
+            model_name = f"{algorithm.replace('_', ' ').title()} - {task.title()}"
         model = MLModel(
             user_id=g.current_user.id,
             dataset_id=dataset.id,
-            model_name=f"{algorithm} ({target_column})",
+            model_name=model_name,
             algorithm=algorithm,
             model_path=model_path,
-            status="complete",
-            config_json={
-                "target_column": target_column,
-                "task_type": task_type,
-                "test_size": test_size,
-                "random_state": 42,
-                **split_summary,
-            },
+            status="completed",
+            config_json=config,
         )
         db.session.add(model)
         db.session.flush()
@@ -634,25 +538,64 @@ def evaluate_model():
         )
         db.session.add(evaluation)
         db.session.commit()
+        log_activity(
+            action="model_trained",
+            user_id=g.current_user.id,
+            details={
+                "model_id": model.id,
+                "algorithm": algorithm,
+                "task_type": task,
+                "dataset_id": dataset.id,
+            },
+        )
     except (OSError, SQLAlchemyError):
         db.session.rollback()
         if model_path:
             try:
                 os.remove(model_path)
-            except FileNotFoundError:
-                pass
             except OSError:
-                current_app.logger.exception("Failed to remove an incomplete model artifact")
-        current_app.logger.exception("Failed to save model evaluation")
-        return jsonify({"error": "The model evaluation could not be saved. Please try again."}), 500
+                pass
+        current_app.logger.exception("Could not persist trained model and evaluation")
+        return jsonify({"error": "The trained model and evaluation could not be saved."}), 500
 
+    model_response = _model_response(model)
+    evaluation_response = _evaluation_response(evaluation)
+    # The US-20 training response keeps its compact chart metric names; the
+    # persisted evaluation retains the explicit weighted aliases used by US-19.
+    evaluation_response["metrics"] = {
+        key: metrics[key] for key in ("accuracy", "precision", "recall", "f1")
+        if key in metrics
+    } if task == "classification" else metrics
     return jsonify({
+        "message": "Model trained and evaluated successfully.",
+        "model": model_response,
+        "evaluation": evaluation_response,
         "model_id": model.id,
         "evaluation_id": evaluation.id,
         "algorithm": algorithm,
-        "task_type": task_type,
+        "task_type": task,
         "metrics": metrics,
         "confusion_matrix": confusion,
         "report": report,
         "split": split_summary,
     }), 201
+
+
+@ml_bp.route("/train", methods=["POST"])
+@non_instructor_required
+def train_model():
+    """Train, persist, and evaluate a model run (US-18 and US-20)."""
+    payload = request.get_json(silent=True) if request.is_json else None
+    if payload is None:
+        return jsonify({"error": "A JSON request body is required."}), 400
+    return _train_and_persist(payload)
+
+
+@ml_bp.route("/evaluate", methods=["POST"])
+@non_instructor_required
+def evaluate_model():
+    """Train and evaluate on a dataset split, persisting both records."""
+    payload = request.get_json(silent=True) if request.is_json else None
+    if payload is None:
+        return jsonify({"error": "A JSON request body is required."}), 400
+    return _train_and_persist(payload)
