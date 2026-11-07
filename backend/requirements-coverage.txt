@@ -1,0 +1,4 @@
+# Optional developer dependencies for the Lab 6 style coverage exercise.
+-r requirements.txt
+coverage>=7.6,<8
+pytest>=8.0,<9

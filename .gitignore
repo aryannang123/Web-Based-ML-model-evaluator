@@ -57,3 +57,7 @@ desktop.ini
 # Logs & Temp
 *.log
 scratch/
+
+# Python test coverage output
+.coverage*
+htmlcov/
