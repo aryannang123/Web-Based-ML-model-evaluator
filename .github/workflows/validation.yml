@@ -1,0 +1,66 @@
+name: Application validation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run backend regression suite
+        working-directory: backend
+        run: python -m unittest discover -s tests -v
+      - name: Check frontend JavaScript syntax
+        run: node --check frontend/js/app.js
+
+  browser:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    env:
+      SECRET_KEY: ci-only-ephemeral-secret
+      DATABASE_URL: sqlite:////tmp/ml-evaluator-ci.sqlite
+      UPLOAD_FOLDER: /tmp/ml-evaluator-ci-uploads
+      SAVED_MODELS_FOLDER: /tmp/ml-evaluator-ci-models
+      HOST: 127.0.0.1
+      PORT: "5055"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install application and browser test dependencies
+        run: |
+          python -m pip install -r backend/requirements.txt -r backend/requirements-e2e.txt
+          python -m playwright install --with-deps ${{ matrix.browser }}
+      - name: Start isolated test server
+        working-directory: backend
+        run: |
+          mkdir -p "$UPLOAD_FOLDER" "$SAVED_MODELS_FOLDER"
+          nohup python app.py >/tmp/ml-evaluator-server.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:5055/api/health >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/ml-evaluator-server.log
+          exit 1
+      - name: Exercise registration, login, upload, training, and chart
+        working-directory: backend
+        run: python tests/browser_smoke.py --browser ${{ matrix.browser }} --base-url http://127.0.0.1:5055

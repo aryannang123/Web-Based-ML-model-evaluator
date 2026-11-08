@@ -1,0 +1,2 @@
+# Isolated browser-test dependency; not required to run the application.
+playwright==1.56.0
