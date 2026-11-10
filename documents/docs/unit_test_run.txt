@@ -1,0 +1,521 @@
+test_authenticated_registration_login_and_csv_upload_are_one_flow (test_auth_dataset_integration.TestAuthDatasetIntegration.test_authenticated_registration_login_and_csv_upload_are_one_flow) ... ok
+test_invalid_credentials_are_rejected_and_do_not_authenticate (test_auth_dataset_integration.TestAuthDatasetIntegration.test_invalid_credentials_are_rejected_and_do_not_authenticate) ... ok
+test_login_page_loads_the_javascript_that_handles_credentials (test_auth_dataset_integration.TestAuthDatasetIntegration.test_login_page_loads_the_javascript_that_handles_credentials) ... C:\Users\gagan\anaconda3\Lib\unittest\case.py:606: ResourceWarning: unclosed file <_io.BufferedReader name='C:\\Users\\gagan\\Documents\\Codex\\2026-10-21\\hey\\work\\Web-Based-ML-model-evaluator-main\\backend\\../frontend/login.html'>
+  if method() is not None:
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\anaconda3\Lib\unittest\case.py:606: ResourceWarning: unclosed file <_io.BufferedReader name='C:\\Users\\gagan\\Documents\\Codex\\2026-10-21\\hey\\work\\Web-Based-ML-model-evaluator-main\\backend\\../frontend/js/app.js'>
+  if method() is not None:
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_registration_login_dashboard_refresh_and_session_cookie (test_auth_dataset_integration.TestAuthDatasetIntegration.test_registration_login_dashboard_refresh_and_session_cookie) ... C:\Users\gagan\anaconda3\Lib\unittest\case.py:606: ResourceWarning: unclosed file <_io.BufferedReader name='C:\\Users\\gagan\\Documents\\Codex\\2026-10-21\\hey\\work\\Web-Based-ML-model-evaluator-main\\backend\\../frontend/index.html'>
+  if method() is not None:
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_unauthenticated_csv_upload_returns_401 (test_auth_dataset_integration.TestAuthDatasetIntegration.test_unauthenticated_csv_upload_returns_401) ... ok
+test_authenticated_user_can_open_dashboard_and_use_protected_api (test_auth_login.TestLogin.test_authenticated_user_can_open_dashboard_and_use_protected_api) ... ok
+test_invalid_password_and_unknown_username_return_same_error (test_auth_login.TestLogin.test_invalid_password_and_unknown_username_return_same_error) ... ok
+test_login_clears_prior_session_data_and_sets_cookie_flags (test_auth_login.TestLogin.test_login_clears_prior_session_data_and_sets_cookie_flags) ... ok
+test_missing_or_invalid_login_payload_returns_clear_client_error (test_auth_login.TestLogin.test_missing_or_invalid_login_payload_returns_clear_client_error) ... ok
+test_stale_session_cannot_open_dashboard (test_auth_login.TestLogin.test_stale_session_cannot_open_dashboard) ... ok
+test_unauthenticated_users_cannot_access_dashboard_or_protected_apis (test_auth_login.TestLogin.test_unauthenticated_users_cannot_access_dashboard_or_protected_apis) ... ok
+test_valid_credentials_create_session_and_return_dashboard_redirect (test_auth_login.TestLogin.test_valid_credentials_create_session_and_return_dashboard_redirect) ... ok
+test_after_logout_protected_pages_cannot_be_accessed (test_auth_logout.TestLogout.test_after_logout_protected_pages_cannot_be_accessed)
+US-06 AC: After logout, protected pages cannot be accessed without logging in again. ... ok
+test_logged_in_user_can_logout_successfully (test_auth_logout.TestLogout.test_logged_in_user_can_logout_successfully)
+US-06 AC: Logged-in users can log out successfully. ... ok
+test_logout_clears_all_session_data (test_auth_logout.TestLogout.test_logout_clears_all_session_data)
+Ensure logout completely clears session data. ... ok
+test_logout_invalidates_the_active_session (test_auth_logout.TestLogout.test_logout_invalidates_the_active_session)
+US-06 AC: Logout invalidates the active session/token. ... ok
+test_logout_when_not_logged_in_returns_gracefully (test_auth_logout.TestLogout.test_logout_when_not_logged_in_returns_gracefully)
+Test logout endpoint when there's no active session. ... ok
+test_multiple_logouts_are_idempotent (test_auth_logout.TestLogout.test_multiple_logouts_are_idempotent)
+Test that multiple logout calls don't cause errors. ... ok
+test_sec_ses_3_st_1_replayed_cookie_is_rejected_after_logout (test_auth_logout.TestLogout.test_sec_ses_3_st_1_replayed_cookie_is_rejected_after_logout)
+SEC-SES-3-ST-1: A captured pre-logout cookie cannot be replayed. ... ok
+test_session_expiration_requires_reauthentication (test_auth_logout.TestLogout.test_session_expiration_requires_reauthentication)
+SEC-SES-2-ST-1: An idle-expired session cannot access a protected API. ... ok
+test_session_state_maintained_while_navigating (test_auth_logout.TestLogout.test_session_state_maintained_while_navigating)
+US-06 AC: User session state is maintained while navigating the application. ... ok
+test_duplicate_email (test_auth_registration.TestRegistration.test_duplicate_email) ... ok
+test_duplicate_username (test_auth_registration.TestRegistration.test_duplicate_username) ... ok
+test_invalid_email (test_auth_registration.TestRegistration.test_invalid_email) ... ok
+test_missing_fields (test_auth_registration.TestRegistration.test_missing_fields) ... ok
+test_password_is_hashed (test_auth_registration.TestRegistration.test_password_is_hashed) ... ok
+test_successful_registration (test_auth_registration.TestRegistration.test_successful_registration) ... ok
+test_archive_round_trip_restores_database_uploads_and_models (test_backup_restore_procedure.BackupRestoreProcedureTests.test_archive_round_trip_restores_database_uploads_and_models) ... ok
+test_authenticated_preview_returns_headers_values_types_and_full_dimensions (test_dataset_upload.TestDatasetUpload.test_authenticated_preview_returns_headers_values_types_and_full_dimensions) ... ok
+test_csv_meeting_the_two_row_two_column_minimum_is_accepted (test_dataset_upload.TestDatasetUpload.test_csv_meeting_the_two_row_two_column_minimum_is_accepted) ... ok
+test_database_failure_rolls_back_and_removes_uploaded_file (test_dataset_upload.TestDatasetUpload.test_database_failure_rolls_back_and_removes_uploaded_file) ... [2026-11-10 18:35:43,962] ERROR in dataset_routes: Failed to save uploaded dataset
+Traceback (most recent call last):
+  File "C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\routes\dataset_routes.py", line 295, in upload_dataset
+    _persist_dataset(dataset)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\gagan\anaconda3\Lib\unittest\mock.py", line 1169, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\gagan\anaconda3\Lib\unittest\mock.py", line 1173, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\gagan\anaconda3\Lib\unittest\mock.py", line 1228, in _execute_mock_call
+    raise effect
+sqlalchemy.exc.SQLAlchemyError: test failure
+ok
+test_empty_file_is_rejected (test_dataset_upload.TestDatasetUpload.test_empty_file_is_rejected) ... ok
+test_invalid_csvs_are_rejected_with_clear_errors (test_dataset_upload.TestDatasetUpload.test_invalid_csvs_are_rejected_with_clear_errors) ... ok
+test_missing_file_is_rejected (test_dataset_upload.TestDatasetUpload.test_missing_file_is_rejected) ... ok
+test_non_csv_extension_is_rejected (test_dataset_upload.TestDatasetUpload.test_non_csv_extension_is_rejected) ... ok
+test_over_limit_upload_returns_json_413 (test_dataset_upload.TestDatasetUpload.test_over_limit_upload_returns_json_413) ... ok
+test_preview_hides_datasets_owned_by_another_user (test_dataset_upload.TestDatasetUpload.test_preview_hides_datasets_owned_by_another_user) ... ok
+test_preview_malformed_csv_returns_clear_400 (test_dataset_upload.TestDatasetUpload.test_preview_malformed_csv_returns_clear_400) ... ok
+test_preview_missing_file_returns_clear_404_without_path (test_dataset_upload.TestDatasetUpload.test_preview_missing_file_returns_clear_404_without_path) ... ok
+test_preview_nonexistent_dataset_returns_404 (test_dataset_upload.TestDatasetUpload.test_preview_nonexistent_dataset_returns_404) ... ok
+test_preview_requires_authentication (test_dataset_upload.TestDatasetUpload.test_preview_requires_authentication) ... ok
+test_preview_serializes_missing_cells_as_null (test_dataset_upload.TestDatasetUpload.test_preview_serializes_missing_cells_as_null) ... ok
+test_preview_unreadable_file_returns_clear_500 (test_dataset_upload.TestDatasetUpload.test_preview_unreadable_file_returns_clear_500) ... ok
+test_request_user_id_cannot_override_authenticated_owner (test_dataset_upload.TestDatasetUpload.test_request_user_id_cannot_override_authenticated_owner) ... ok
+test_statistics_returns_numeric_summary_and_missing_counts (test_dataset_upload.TestDatasetUpload.test_statistics_returns_numeric_summary_and_missing_counts) ... ok
+test_unknown_session_user_is_rejected (test_dataset_upload.TestDatasetUpload.test_unknown_session_user_is_rejected) ... ok
+test_upload_requires_a_verified_session_user (test_dataset_upload.TestDatasetUpload.test_upload_requires_a_verified_session_user) ... ok
+test_us11_replacement_of_another_users_dataset_is_hidden (test_dataset_upload.TestDatasetUpload.test_us11_replacement_of_another_users_dataset_is_hidden) ... ok
+test_us11_replacement_updates_owned_dataset_without_changing_its_id (test_dataset_upload.TestDatasetUpload.test_us11_replacement_updates_owned_dataset_without_changing_its_id) ... ok
+test_valid_upload_persists_metadata_and_uses_unique_server_path (test_dataset_upload.TestDatasetUpload.test_valid_upload_persists_metadata_and_uses_unique_server_path) ... ok
+test_fr43_classification_metrics_and_confusion_matrix (test_evaluation_metrics.TestEvaluationMetrics.test_fr43_classification_metrics_and_confusion_matrix) ... ok
+test_fr43_regression_metrics_match_known_values (test_evaluation_metrics.TestEvaluationMetrics.test_fr43_regression_metrics_match_known_values) ... ok
+test_invalid_task_type_is_rejected (test_evaluation_metrics.TestEvaluationMetrics.test_invalid_task_type_is_rejected) ... ok
+test_evaluation_for_another_users_model_is_rejected (test_evaluation_ownership.TestEvaluationOwnership.test_evaluation_for_another_users_model_is_rejected) ... ok
+test_existing_tables_receive_ownership_triggers_on_initialization (test_evaluation_ownership.TestEvaluationOwnership.test_existing_tables_receive_ownership_triggers_on_initialization) ... ok
+test_model_owner_cannot_change_away_from_existing_evaluations (test_evaluation_ownership.TestEvaluationOwnership.test_model_owner_cannot_change_away_from_existing_evaluations) ... ok
+test_same_owner_evaluation_is_accepted (test_evaluation_ownership.TestEvaluationOwnership.test_same_owner_evaluation_is_accepted) ... ok
+test_updating_evaluation_to_another_users_model_is_rejected (test_evaluation_ownership.TestEvaluationOwnership.test_updating_evaluation_to_another_users_model_is_rejected) ... ok
+test_auth_and_upload_frontend_flows_remain_wired (test_frontend_backend_integration.TestFrontendBackendIntegration.test_auth_and_upload_frontend_flows_remain_wired) ... ok
+test_backend_health_endpoint (test_frontend_backend_integration.TestFrontendBackendIntegration.test_backend_health_endpoint) ... ok
+test_dashboard_file_is_protected (test_frontend_backend_integration.TestFrontendBackendIntegration.test_dashboard_file_is_protected) ... ok
+test_frontend_javascript_is_served (test_frontend_backend_integration.TestFrontendBackendIntegration.test_frontend_javascript_is_served) ... ok
+test_frontend_page_loads (test_frontend_backend_integration.TestFrontendBackendIntegration.test_frontend_page_loads) ... ok
+test_login_page_loads (test_frontend_backend_integration.TestFrontendBackendIntegration.test_login_page_loads) ... ok
+test_us08_csv_upload_form_and_confirmation_are_wired (test_frontend_backend_integration.TestFrontendBackendIntegration.test_us08_csv_upload_form_and_confirmation_are_wired) ... ok
+test_us12_preview_is_loaded_after_upload_and_rendered_safely (test_frontend_backend_integration.TestFrontendBackendIntegration.test_us12_preview_is_loaded_after_upload_and_rendered_safely) ... ok
+test_us14a_admin_panel_elements_and_wiring (test_frontend_backend_integration.TestFrontendBackendIntegration.test_us14a_admin_panel_elements_and_wiring) ... ok
+test_us16_split_slider_updates_and_is_sent_to_evaluation (test_frontend_backend_integration.TestFrontendBackendIntegration.test_us16_split_slider_updates_and_is_sent_to_evaluation) ... ok
+test_us17_to_us20_frontend_catalog_history_comparison_and_review_are_wired (test_frontend_backend_integration.TestFrontendBackendIntegration.test_us17_to_us20_frontend_catalog_history_comparison_and_review_are_wired) ... ok
+test_admin_can_change_role_through_existing_admin_api (test_release_gaps.TestReleaseGapImplementations.test_admin_can_change_role_through_existing_admin_api) ... ok
+test_admin_panel_has_safe_role_editor_wiring (test_release_gaps.TestReleaseGapImplementations.test_admin_panel_has_safe_role_editor_wiring) ... ok
+test_ci_configures_backend_and_three_engine_browser_smokes (test_release_gaps.TestReleaseGapImplementations.test_ci_configures_backend_and_three_engine_browser_smokes) ... ok
+test_database_schema_document_matches_current_model_inventory (test_release_gaps.TestReleaseGapImplementations.test_database_schema_document_matches_current_model_inventory) ... ok
+test_dependency_audit_covers_application_and_browser_requirements (test_release_gaps.TestReleaseGapImplementations.test_dependency_audit_covers_application_and_browser_requirements) ... ok
+test_evaluation_chart_does_not_require_chartjs (test_release_gaps.TestReleaseGapImplementations.test_evaluation_chart_does_not_require_chartjs) ... ok
+test_failed_logins_hit_configured_account_throttle_and_hash_identifiers (test_release_gaps.TestReleaseGapImplementations.test_failed_logins_hit_configured_account_throttle_and_hash_identifiers) ... ok
+test_first_admin_is_created_by_one_time_local_cli_only (test_release_gaps.TestReleaseGapImplementations.test_first_admin_is_created_by_one_time_local_cli_only) ... ok
+test_sensitive_api_endpoint_uses_configured_per_ip_limit (test_release_gaps.TestReleaseGapImplementations.test_sensitive_api_endpoint_uses_configured_per_ip_limit) ... ok
+test_endpoint_defaults_to_real_80_20_partitions (test_train_test_split.TestTrainTestSplit.test_endpoint_defaults_to_real_80_20_partitions) ... ok
+test_endpoint_enforces_algorithm_sample_minimum (test_train_test_split.TestTrainTestSplit.test_endpoint_enforces_algorithm_sample_minimum) ... ok
+test_endpoint_rejects_invalid_ratio_values (test_train_test_split.TestTrainTestSplit.test_endpoint_rejects_invalid_ratio_values) ... ok
+test_endpoint_rejects_splits_without_both_partitions (test_train_test_split.TestTrainTestSplit.test_endpoint_rejects_splits_without_both_partitions) ... ok
+test_endpoint_uses_custom_70_30_partition_sizes (test_train_test_split.TestTrainTestSplit.test_endpoint_uses_custom_70_30_partition_sizes) ... ok
+test_evaluate_endpoint_denies_another_users_dataset (test_train_test_split.TestTrainTestSplit.test_evaluate_endpoint_denies_another_users_dataset) ... ok
+test_evaluate_endpoint_requires_authentication (test_train_test_split.TestTrainTestSplit.test_evaluate_endpoint_requires_authentication) ... ok
+test_split_helper_defaults_to_80_20_and_is_deterministic (test_train_test_split.TestTrainTestSplit.test_split_helper_defaults_to_80_20_and_is_deterministic) ... ok
+test_split_helper_rejects_invalid_ratio_types_and_boundaries (test_train_test_split.TestTrainTestSplit.test_split_helper_rejects_invalid_ratio_types_and_boundaries) ... ok
+test_split_helper_uses_custom_70_30_ratio (test_train_test_split.TestTrainTestSplit.test_split_helper_uses_custom_70_30_ratio) ... ok
+test_train_endpoint_uses_the_same_selected_split (test_train_test_split.TestTrainTestSplit.test_train_endpoint_uses_the_same_selected_split) ... ok
+test_us15_target_column_is_validated_and_bad_requests_do_not_save_runs (test_train_test_split.TestTrainTestSplit.test_us15_target_column_is_validated_and_bad_requests_do_not_save_runs) ... ok
+test_us17_all_supported_estimators_fit_for_their_task_type (test_train_test_split.TestTrainTestSplit.test_us17_all_supported_estimators_fit_for_their_task_type) ... ok
+test_us17_catalog_and_every_algorithm_task_pair_are_supported (test_train_test_split.TestTrainTestSplit.test_us17_catalog_and_every_algorithm_task_pair_are_supported) ... ok
+test_us18_failed_training_does_not_remove_prior_successful_run (test_train_test_split.TestTrainTestSplit.test_us18_failed_training_does_not_remove_prior_successful_run) ... ok
+test_us19a_instructor_sees_only_shared_runs_and_cannot_write (test_train_test_split.TestTrainTestSplit.test_us19a_instructor_sees_only_shared_runs_and_cannot_write) ... ok
+test_us20_compare_and_download_artifacts_for_owner (test_train_test_split.TestTrainTestSplit.test_us20_compare_and_download_artifacts_for_owner) ... C:\Users\gagan\anaconda3\Lib\unittest\case.py:606: ResourceWarning: unclosed file <_io.BufferedReader name='C:\\Users\\gagan\\Documents\\Codex\\2026-10-21\\hey\\work\\Web-Based-ML-model-evaluator-main\\backend\\tmp\\test-temp\\ml-evaluator-split-tests-8ba7xcht\\models\\1\\b6961cfcb51d4866abdfe2dd82810c2d.joblib'>
+  if method() is not None:
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_us20_comparison_rejects_invalid_and_missing_run_requests (test_train_test_split.TestTrainTestSplit.test_us20_comparison_rejects_invalid_and_missing_run_requests) ... ok
+test_us20_comparison_rejects_mixed_classification_and_regression (test_train_test_split.TestTrainTestSplit.test_us20_comparison_rejects_mixed_classification_and_regression) ... ok
+test_FR_1_1_UT_1_valid_registration_is_saved_and_confirmed (test_us01_us05_acceptance.TestUS01ToUS05Acceptance.test_FR_1_1_UT_1_valid_registration_is_saved_and_confirmed) ... ok
+test_FR_1_1_UT_2_missing_or_invalid_registration_is_rejected (test_us01_us05_acceptance.TestUS01ToUS05Acceptance.test_FR_1_1_UT_2_missing_or_invalid_registration_is_rejected) ... ok
+test_FR_1_1_duplicate_username_and_email_are_rejected (test_us01_us05_acceptance.TestUS01ToUS05Acceptance.test_FR_1_1_duplicate_username_and_email_are_rejected) ... ok
+test_FR_1_2_UT_1_valid_credentials_create_session_and_redirect (test_us01_us05_acceptance.TestUS01ToUS05Acceptance.test_FR_1_2_UT_1_valid_credentials_create_session_and_redirect) ... ok
+test_FR_1_2_UT_2_wrong_password_and_unknown_user_share_error (test_us01_us05_acceptance.TestUS01ToUS05Acceptance.test_FR_1_2_UT_2_wrong_password_and_unknown_user_share_error) ... ok
+test_FR_1_4_ST_1_anonymous_dashboard_and_api_requests_are_denied (test_us01_us05_acceptance.TestUS01ToUS05Acceptance.test_FR_1_4_ST_1_anonymous_dashboard_and_api_requests_are_denied) ... ok
+test_SEC_AUTH_2_registered_password_is_hashed (test_us01_us05_acceptance.TestUS01ToUS05Acceptance.test_SEC_AUTH_2_registered_password_is_hashed) ... ok
+test_US01_repository_structure_is_present (test_us01_us05_acceptance.TestUS01ToUS05Acceptance.test_US01_repository_structure_is_present)
+US-01: required frontend, backend, ML, database, README, and ignore files. ... ok
+test_US02_required_schema_tables_and_relationships_exist (test_us01_us05_acceptance.TestUS01ToUS05Acceptance.test_US02_required_schema_tables_and_relationships_exist)
+US-02: user, dataset, model, evaluation tables and foreign keys. ... ok
+test_US03_health_and_frontend_assets_use_json_and_live_routes (test_us01_us05_acceptance.TestUS01ToUS05Acceptance.test_US03_health_and_frontend_assets_use_json_and_live_routes)
+US-03: frontend can reach a JSON API and load its JS/CSS from Flask. ... ok
+test_authenticated_login_can_load_the_dashboard (test_us01_us05_acceptance.TestUS01ToUS05Acceptance.test_authenticated_login_can_load_the_dashboard) ... ok
+test_registration_enforces_the_eight_to_128_character_password_policy (test_us01_us05_acceptance.TestUS01ToUS05Acceptance.test_registration_enforces_the_eight_to_128_character_password_policy) ... ok
+test_fr_2_5_st_2_each_user_lists_only_their_dataset_metadata (test_us07_data_isolation.TestUserDataIsolation.test_fr_2_5_st_2_each_user_lists_only_their_dataset_metadata)
+FR-2.5-ST-2: Dataset listing and metadata remain isolated by owner. ... ok
+test_fr_6_1_st_2_run_and_evaluation_history_is_private (test_us07_data_isolation.TestUserDataIsolation.test_fr_6_1_st_2_run_and_evaluation_history_is_private)
+FR-6.1-ST-2: Each account sees and retrieves only its own run/results. ... ok
+test_mismatched_model_or_evaluation_ownership_is_never_visible (test_us07_data_isolation.TestUserDataIsolation.test_mismatched_model_or_evaluation_ownership_is_never_visible)
+SEC-AZ-2-ST-1: Related owner IDs must all agree for access. ... ok
+test_nfr_4_st_1_anonymous_direct_requests_are_rejected (test_us07_data_isolation.TestUserDataIsolation.test_nfr_4_st_1_anonymous_direct_requests_are_rejected)
+NFR-4-ST-1: Authorization is enforced by the backend, not the UI. ... ok
+test_nfr_5_st_1_and_sec_dat_1_lists_do_not_disclose_foreign_resources (test_us07_data_isolation.TestUserDataIsolation.test_nfr_5_st_1_and_sec_dat_1_lists_do_not_disclose_foreign_resources)
+NFR-5-ST-1 / SEC-DAT-1-ST-1: Resource lists are owner-scoped. ... ok
+test_sec_az_2_st_1_foreign_dataset_model_and_evaluation_ids_are_denied (test_us07_data_isolation.TestUserDataIsolation.test_sec_az_2_st_1_foreign_dataset_model_and_evaluation_ids_are_denied)
+SEC-AZ-2-ST-1: Direct IDs cannot retrieve another owner's records. ... ok
+test_encoding_fills_null_cats_before_encoding (test_us14_preprocessing.TestDataPreprocessorEncoding.test_encoding_fills_null_cats_before_encoding)
+Encoding must not crash when categorical column has NaN values. ... ok
+test_label_encoding_converts_strings_to_integers (test_us14_preprocessing.TestDataPreprocessorEncoding.test_label_encoding_converts_strings_to_integers)
+Label encoding must produce integer-dtype columns for all categoricals. ... ok
+test_none_encoding_leaves_frame_unchanged (test_us14_preprocessing.TestDataPreprocessorEncoding.test_none_encoding_leaves_frame_unchanged)
+Strategy 'none' must return an identical copy. ... ok
+test_onehot_encoding_expands_categorical_columns (test_us14_preprocessing.TestDataPreprocessorEncoding.test_onehot_encoding_expands_categorical_columns)
+One-hot encoding must expand each categorical feature into indicator columns. ... ok
+test_empty_dataframe_raises_in_pipeline (test_us14_preprocessing.TestDataPreprocessorInvalidConfigs.test_empty_dataframe_raises_in_pipeline)
+Pipeline must reject a DataFrame with fewer than 2 rows. ... ok
+test_invalid_encoding_strategy_raises (test_us14_preprocessing.TestDataPreprocessorInvalidConfigs.test_invalid_encoding_strategy_raises)
+Unsupported encoding strategy name raises ValueError. ... ok
+test_invalid_missing_strategy_raises (test_us14_preprocessing.TestDataPreprocessorInvalidConfigs.test_invalid_missing_strategy_raises)
+Unsupported missing-value strategy name raises ValueError. ... ok
+test_invalid_scaling_strategy_raises (test_us14_preprocessing.TestDataPreprocessorInvalidConfigs.test_invalid_scaling_strategy_raises)
+Unsupported scaling strategy name raises ValueError. ... ok
+test_scaling_on_non_numeric_column_raises (test_us14_preprocessing.TestDataPreprocessorInvalidConfigs.test_scaling_on_non_numeric_column_raises)
+Applying scaling to a DataFrame with non-numeric feature columns raises ValueError. ... ok
+test_scaling_with_missing_values_raises (test_us14_preprocessing.TestDataPreprocessorInvalidConfigs.test_scaling_with_missing_values_raises)
+Applying scaling to a column that still has NaN must raise ValueError. ... ok
+test_constant_strategy_fills_numeric_with_zero (test_us14_preprocessing.TestDataPreprocessorMissingValues.test_constant_strategy_fills_numeric_with_zero)
+Strategy 'constant' must fill numeric nulls with 0 by default. ... ok
+test_drop_raises_if_result_is_too_small (test_us14_preprocessing.TestDataPreprocessorMissingValues.test_drop_raises_if_result_is_too_small)
+Dropping all rows must raise ValueError with a useful message. ... ok
+test_drop_strategy_removes_rows_with_nulls (test_us14_preprocessing.TestDataPreprocessorMissingValues.test_drop_strategy_removes_rows_with_nulls)
+Strategy 'drop' must remove every row that contains a NaN. ... ok
+test_mean_strategy_categorical_column_uses_mode (test_us14_preprocessing.TestDataPreprocessorMissingValues.test_mean_strategy_categorical_column_uses_mode)
+Strategy 'mean' on a categorical column must fall back to mode. ... ok
+test_mean_strategy_fills_numeric_nulls (test_us14_preprocessing.TestDataPreprocessorMissingValues.test_mean_strategy_fills_numeric_nulls)
+Strategy 'mean' must fill numeric nulls with the column mean. ... ok
+test_median_strategy_fills_numeric_nulls (test_us14_preprocessing.TestDataPreprocessorMissingValues.test_median_strategy_fills_numeric_nulls)
+Strategy 'median' must fill numeric nulls with the column median. ... ok
+test_mode_strategy_fills_nulls_with_most_frequent (test_us14_preprocessing.TestDataPreprocessorMissingValues.test_mode_strategy_fills_nulls_with_most_frequent)
+Strategy 'mode' must fill each column with its most frequent value. ... ok
+test_none_strategy_leaves_frame_unchanged (test_us14_preprocessing.TestDataPreprocessorMissingValues.test_none_strategy_leaves_frame_unchanged)
+Strategy 'none' must return an identical copy of the DataFrame. ... ok
+test_pipeline_applies_all_steps_in_order (test_us14_preprocessing.TestDataPreprocessorPipeline.test_pipeline_applies_all_steps_in_order)
+Pipeline (missing + encoding + scaling) must complete without errors. ... ok
+test_pipeline_raises_on_invalid_target_column (test_us14_preprocessing.TestDataPreprocessorPipeline.test_pipeline_raises_on_invalid_target_column)
+Pipeline must raise ValueError for a nonexistent target column. ... ok
+test_pipeline_returns_row_and_column_counts (test_us14_preprocessing.TestDataPreprocessorPipeline.test_pipeline_returns_row_and_column_counts)
+Summary dict must contain rows_before, rows_after, columns_after. ... ok
+test_minmax_scales_to_0_1 (test_us14_preprocessing.TestDataPreprocessorScaling.test_minmax_scales_to_0_1)
+MinMax normalization must produce values in [0.0, 1.0]. ... ok
+test_none_scaling_leaves_frame_unchanged (test_us14_preprocessing.TestDataPreprocessorScaling.test_none_scaling_leaves_frame_unchanged)
+Strategy 'none' must return values identical to the input. ... ok
+test_scaling_excludes_target_column (test_us14_preprocessing.TestDataPreprocessorScaling.test_scaling_excludes_target_column)
+Scaling must not alter the values in the target column. ... ok
+test_standard_scaling_produces_near_zero_mean (test_us14_preprocessing.TestDataPreprocessorScaling.test_standard_scaling_produces_near_zero_mean)
+Standardization must produce columns with mean \u2248 0 and std \u2248 1. ... ok
+test_invalid_encoding_strategy_returns_400 (test_us14_preprocessing.TestPreprocessEndpoint.test_invalid_encoding_strategy_returns_400)
+FR-3.1-UT-2 / SEC-INP-1: Invalid encoding option rejected with HTTP 400. ... ok
+test_invalid_missing_strategy_returns_400 (test_us14_preprocessing.TestPreprocessEndpoint.test_invalid_missing_strategy_returns_400)
+FR-3.1-UT-2 / SEC-INP-1: Invalid missing_values option rejected with HTTP 400. ... ok
+test_invalid_scaling_strategy_returns_400 (test_us14_preprocessing.TestPreprocessEndpoint.test_invalid_scaling_strategy_returns_400)
+FR-3.1-UT-2 / SEC-INP-1: Invalid scaling option rejected with HTTP 400. ... ok
+test_label_encoding_applied_to_dataset (test_us14_preprocessing.TestPreprocessEndpoint.test_label_encoding_applied_to_dataset)
+FR-3.1-UT-1: Label encoding on categorical columns succeeds. ... ok
+test_mean_imputation_fills_missing_values (test_us14_preprocessing.TestPreprocessEndpoint.test_mean_imputation_fills_missing_values)
+FR-3.1-UT-1: Mean imputation on dataset with NaN values succeeds. ... ok
+test_minmax_scaling_applied_after_encoding (test_us14_preprocessing.TestPreprocessEndpoint.test_minmax_scaling_applied_after_encoding)
+FR-3.1-UT-1: MinMax scaling after label encoding produces valid response. ... ok
+test_no_op_preprocessing_succeeds (test_us14_preprocessing.TestPreprocessEndpoint.test_no_op_preprocessing_succeeds)
+FR-3.1-UT-1: All-'none' config is valid and returns unchanged dimensions. ... ok
+test_nonexistent_target_column_returns_400 (test_us14_preprocessing.TestPreprocessEndpoint.test_nonexistent_target_column_returns_400)
+FR-3.1-UT-2: A nonexistent target_column is rejected with HTTP 400. ... ok
+test_onehot_encoding_expands_column_count (test_us14_preprocessing.TestPreprocessEndpoint.test_onehot_encoding_expands_column_count)
+FR-3.1-UT-1: One-hot encoding expands categorical columns into indicators. ... ok
+test_preprocess_another_users_dataset_returns_404 (test_us14_preprocessing.TestPreprocessEndpoint.test_preprocess_another_users_dataset_returns_404)
+SEC-AZ-2: User B cannot preprocess User A's dataset (returns 404). ... ok
+test_preprocess_nonexistent_dataset_returns_404 (test_us14_preprocessing.TestPreprocessEndpoint.test_preprocess_nonexistent_dataset_returns_404)
+SEC-AZ-2: Preprocessing a non-existent dataset ID returns 404. ... ok
+test_preprocess_unauthenticated_returns_401 (test_us14_preprocessing.TestPreprocessEndpoint.test_preprocess_unauthenticated_returns_401)
+SEC-AZ-2: Unauthenticated request to preprocess endpoint returns 401. ... ok
+test_response_contains_preview_rows (test_us14_preprocessing.TestPreprocessEndpoint.test_response_contains_preview_rows)
+API response must include sample preview rows after preprocessing. ... ok
+test_scaling_without_encoding_on_mixed_data_returns_400 (test_us14_preprocessing.TestPreprocessEndpoint.test_scaling_without_encoding_on_mixed_data_returns_400)
+FR-3.1-UT-2: Scaling mixed data without encoding is rejected with HTTP 400. ... ok
+test_standard_scaling_applied_after_encoding (test_us14_preprocessing.TestPreprocessEndpoint.test_standard_scaling_applied_after_encoding)
+FR-3.1-UT-1: Standardization scaling after label encoding succeeds. ... ok
+test_fr7_1_st_1_admin_can_view_registered_users_list (test_us14a_rbac_admin.TestUS14aRBACAndAdmin.test_fr7_1_st_1_admin_can_view_registered_users_list)
+FR-7.1-ST-1: Verify admin can view all registered platform accounts. ... ok
+test_fr7_1_st_2_admin_can_perform_supported_account_management_action (test_us14a_rbac_admin.TestUS14aRBACAndAdmin.test_fr7_1_st_2_admin_can_perform_supported_account_management_action)
+FR-7.1-ST-2: Verify admin can view details and toggle user active status. ... ok
+test_fr7_1_st_3_non_admin_cannot_access_or_call_user_management (test_us14a_rbac_admin.TestUS14aRBACAndAdmin.test_fr7_1_st_3_non_admin_cannot_access_or_call_user_management)
+FR-7.1-ST-3: Verify non-admin (Student/Instructor) direct calls are denied. ... ok
+test_fr7_2_st_1_admin_can_view_stored_dataset_records_and_metadata (test_us14a_rbac_admin.TestUS14aRBACAndAdmin.test_fr7_2_st_1_admin_can_view_stored_dataset_records_and_metadata)
+FR-7.2-ST-1: Verify admin can view dataset records and metadata across accounts. ... ok
+test_fr7_2_st_2_dataset_management_preserves_ownership_associations (test_us14a_rbac_admin.TestUS14aRBACAndAdmin.test_fr7_2_st_2_dataset_management_preserves_ownership_associations)
+FR-7.2-ST-2: Verify dataset management preserves dataset user_id ownership. ... ok
+test_fr7_2_st_3_non_admin_cannot_access_administrative_dataset_management (test_us14a_rbac_admin.TestUS14aRBACAndAdmin.test_fr7_2_st_3_non_admin_cannot_access_administrative_dataset_management)
+FR-7.2-ST-3: Verify non-admin (Student/Instructor) cannot call admin dataset endpoints. ... ok
+test_fr7_3_st_1_admin_can_view_application_activity_logs (test_us14a_rbac_admin.TestUS14aRBACAndAdmin.test_fr7_3_st_1_admin_can_view_application_activity_logs)
+FR-7.3-ST-1: Verify admin can view recorded system activity logs. ... ok
+test_fr7_3_st_2_activity_logs_are_read_only_and_mask_secrets (test_us14a_rbac_admin.TestUS14aRBACAndAdmin.test_fr7_3_st_2_activity_logs_are_read_only_and_mask_secrets)
+FR-7.3-ST-2: Verify logs are read-only and never expose sensitive passwords or tokens. ... ok
+test_fr7_3_st_3_non_admin_cannot_access_system_log_interface (test_us14a_rbac_admin.TestUS14aRBACAndAdmin.test_fr7_3_st_3_non_admin_cannot_access_system_log_interface)
+FR-7.3-ST-3: Verify non-admin and Instructor cannot call activity log API. ... ok
+test_fr7_5_it_1_newly_registered_users_assigned_student_role_by_default (test_us14a_rbac_admin.TestUS14aRBACAndAdmin.test_fr7_5_it_1_newly_registered_users_assigned_student_role_by_default)
+FR-7.5-IT-1: Verify new user registration always assigns the Student role. ... ok
+test_fr7_5_st_1_cross_role_access_control_enforced_server_side (test_us14a_rbac_admin.TestUS14aRBACAndAdmin.test_fr7_5_st_1_cross_role_access_control_enforced_server_side)
+FR-7.5-ST-1: Verify server-side role enforcement blocks student & instructor from admin endpoints. ... ok
+test_supported_algorithms_contains_required_entries (test_us18_model_training.TestModelTrainerAlgorithmSupport.test_supported_algorithms_contains_required_entries)
+Required algorithms from the SRS must appear in the list. ... ok
+test_supported_algorithms_list_is_not_empty (test_us18_model_training.TestModelTrainerAlgorithmSupport.test_supported_algorithms_list_is_not_empty)
+SUPPORTED_ALGORITHMS must not be empty. ... ok
+test_train_decision_tree_classification (test_us18_model_training.TestModelTrainerAlgorithmSupport.test_train_decision_tree_classification)
+FR-4.1-UT-1: decision_tree is compatible with classification. ... ok
+test_train_decision_tree_regression (test_us18_model_training.TestModelTrainerAlgorithmSupport.test_train_decision_tree_regression)
+FR-4.1-UT-1: decision_tree is compatible with regression. ... ok
+test_train_knn_classification (test_us18_model_training.TestModelTrainerAlgorithmSupport.test_train_knn_classification)
+FR-4.1-UT-1: knn is compatible with classification. ... ok
+test_train_knn_regression (test_us18_model_training.TestModelTrainerAlgorithmSupport.test_train_knn_regression)
+FR-4.1-UT-1: knn is compatible with regression. ... ok
+test_train_linear_regression_regression (test_us18_model_training.TestModelTrainerAlgorithmSupport.test_train_linear_regression_regression)
+FR-4.1-UT-1: linear_regression is compatible with regression. ... ok
+test_train_logistic_regression_classification (test_us18_model_training.TestModelTrainerAlgorithmSupport.test_train_logistic_regression_classification)
+FR-4.1-UT-1: logistic_regression is compatible with classification. ... ok
+test_train_random_forest_classification (test_us18_model_training.TestModelTrainerAlgorithmSupport.test_train_random_forest_classification)
+FR-4.1-UT-1: random_forest is compatible with classification. ... ok
+test_train_random_forest_regression (test_us18_model_training.TestModelTrainerAlgorithmSupport.test_train_random_forest_regression)
+FR-4.1-UT-1: random_forest is compatible with regression. ... ok
+test_trained_model_can_predict (test_us18_model_training.TestModelTrainerAlgorithmSupport.test_trained_model_can_predict)
+FR-4.1-UT-1: Trained model must return predictions for unseen samples. ... C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\sklearn\utils\validation.py:2830: UserWarning: X does not have valid feature names, but SimpleImputer was fitted with feature names
+  warnings.warn(
+ok
+test_error_message_mentions_supported_algorithms (test_us18_model_training.TestModelTrainerIncompatibleConfigs.test_error_message_mentions_supported_algorithms)
+FR-4.1-IT-2: ValueError for unknown algorithm mentions supported options. ... ok
+test_linear_regression_with_classification_task_raises (test_us18_model_training.TestModelTrainerIncompatibleConfigs.test_linear_regression_with_classification_task_raises)
+FR-4.1-IT-2: linear_regression is incompatible with classification task. ... ok
+test_logistic_regression_with_regression_task_raises (test_us18_model_training.TestModelTrainerIncompatibleConfigs.test_logistic_regression_with_regression_task_raises)
+FR-4.1-IT-2: logistic_regression is incompatible with regression task. ... ok
+test_unknown_algorithm_raises (test_us18_model_training.TestModelTrainerIncompatibleConfigs.test_unknown_algorithm_raises)
+FR-4.1-IT-2: An unrecognised algorithm name raises ValueError. ... ok
+test_unknown_task_type_raises (test_us18_model_training.TestModelTrainerIncompatibleConfigs.test_unknown_task_type_raises)
+FR-4.1-IT-2: An unrecognised task_type raises ValueError. ... ok
+test_save_writes_file (test_us18_model_training.TestModelTrainerSave.test_save_writes_file)
+save() must create a readable file at the given path. ... C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\sklearn\utils\validation.py:2830: UserWarning: X does not have valid feature names, but SimpleImputer was fitted with feature names
+  warnings.warn(
+ok
+test_algorithms_list_contains_required_algorithms (test_us18_model_training.TestTrainEndpoint.test_algorithms_list_contains_required_algorithms)
+FR-4.1-UT-1: Response must list all SRS-required algorithm names. ... ok
+test_get_algorithms_returns_200_for_authenticated_user (test_us18_model_training.TestTrainEndpoint.test_get_algorithms_returns_200_for_authenticated_user)
+FR-4.1-UT-1: Authenticated user receives algorithm list with HTTP 200. ... ok
+test_get_algorithms_returns_401_for_unauthenticated (test_us18_model_training.TestTrainEndpoint.test_get_algorithms_returns_401_for_unauthenticated)
+FR-4.1-UT-1: Unauthenticated request to /algorithms returns 401. ... ok
+test_get_model_after_training_returns_completed_record (test_us18_model_training.TestTrainEndpoint.test_get_model_after_training_returns_completed_record)
+FR-6.1-IT-1 / FR-4.2-IT-1: GET /api/ml/models/<id> returns the trained model. ... ok
+test_invalid_task_type_returns_400 (test_us18_model_training.TestTrainEndpoint.test_invalid_task_type_returns_400)
+FR-4.1-IT-2: An invalid task_type is rejected with HTTP 400. ... C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F6195C98A0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F6195C97B0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F6195C8400>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F6195C84F0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61B85C4F0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61B85C310>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61B85D120>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61B85CF40>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61B85DC60>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61B85DA80>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61B85EA70>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61B85C040>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61B85F5B0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61B85F3D0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61B85FE20>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61B85FF10>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CA4CC70>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CA4CA90>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CA4D990>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CA4D7B0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CA4E6B0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CA4FB50>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CA4F880>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CC6C6D0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CC6C4F0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CC6D030>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CC6CE50>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CA4C6D0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CA4F1F0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CA4F010>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CC6E2F0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CC6DF30>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CC6EC50>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CC6F790>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CC6F5B0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CE74400>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CE74220>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CE74F40>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CE74D60>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CC6EA70>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CE75D50>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CE753F0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CFF7790>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CFF75B0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CE772E0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CE77790>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CFF6980>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CFF66B0>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CE76A70>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\.venv\Lib\site-packages\werkzeug\routing\rules.py:770: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000002F61CE76890>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_invalid_test_size_returns_400 (test_us18_model_training.TestTrainEndpoint.test_invalid_test_size_returns_400)
+FR-3.3-UT-2 / FR-4.1-IT-2: Invalid test_size value returns 400. ... ok
+test_linear_regression_with_classification_task_returns_400 (test_us18_model_training.TestTrainEndpoint.test_linear_regression_with_classification_task_returns_400)
+FR-4.1-IT-2: linear_regression + classification task rejected with 400. ... ok
+test_list_models_includes_trained_model (test_us18_model_training.TestTrainEndpoint.test_list_models_includes_trained_model)
+FR-6.1-IT-1: GET /api/ml/models lists the user's trained model. ... ok
+test_logistic_regression_with_regression_task_returns_400 (test_us18_model_training.TestTrainEndpoint.test_logistic_regression_with_regression_task_returns_400)
+FR-4.1-IT-2: logistic_regression + regression task rejected with 400. ... ok
+test_missing_required_fields_returns_400 (test_us18_model_training.TestTrainEndpoint.test_missing_required_fields_returns_400)
+FR-4.1-IT-2: Omitting required fields returns HTTP 400. ... ok
+test_model_not_visible_to_other_user (test_us18_model_training.TestTrainEndpoint.test_model_not_visible_to_other_user)
+SEC-AZ: User B cannot retrieve User A's trained model record. ... ok
+test_models_list_isolated_per_user (test_us18_model_training.TestTrainEndpoint.test_models_list_isolated_per_user)
+SEC-AZ: User B's /models list does not include User A's models. ... ok
+test_models_list_still_shows_completed_run_after_failed_training (test_us18_model_training.TestTrainEndpoint.test_models_list_still_shows_completed_run_after_failed_training)
+FR-4.2-IT-2: GET /api/ml/models still includes prior runs after a failure. ... ok
+test_nonexistent_target_column_returns_400 (test_us18_model_training.TestTrainEndpoint.test_nonexistent_target_column_returns_400)
+FR-4.1-IT-2: A target column that doesn't exist in the CSV returns 400. ... ok
+test_prior_completed_run_intact_after_failed_training (test_us18_model_training.TestTrainEndpoint.test_prior_completed_run_intact_after_failed_training)
+FR-4.2-IT-2: A failed training attempt does not corrupt a prior completed run. ... ok
+test_train_classification_random_forest_returns_201 (test_us18_model_training.TestTrainEndpoint.test_train_classification_random_forest_returns_201)
+FR-4.2-IT-1: Valid classification training request returns HTTP 201. ... ok
+test_train_model_file_is_created_on_disk (test_us18_model_training.TestTrainEndpoint.test_train_model_file_is_created_on_disk)
+FR-4.2-IT-1: joblib model file must exist at the reported path after training. ... ok
+test_train_on_another_users_dataset_returns_404 (test_us18_model_training.TestTrainEndpoint.test_train_on_another_users_dataset_returns_404)
+SEC-AZ: User B cannot train on User A's dataset (returns 404). ... ok
+test_train_on_nonexistent_dataset_returns_404 (test_us18_model_training.TestTrainEndpoint.test_train_on_nonexistent_dataset_returns_404)
+SEC-AZ: Training on a non-existent dataset_id returns 404. ... ok
+test_train_regression_linear_regression_returns_201 (test_us18_model_training.TestTrainEndpoint.test_train_regression_linear_regression_returns_201)
+FR-4.2-IT-1: Valid regression training request returns HTTP 201. ... ok
+test_train_response_contains_configuration_snapshot (test_us18_model_training.TestTrainEndpoint.test_train_response_contains_configuration_snapshot)
+FR-4.2-IT-1: Response model must include the training configuration. ... ok
+test_train_stores_model_in_database (test_us18_model_training.TestTrainEndpoint.test_train_stores_model_in_database)
+FR-4.2-IT-1: Completed training must persist a model record in the DB. ... ok
+test_train_unauthenticated_returns_401 (test_us18_model_training.TestTrainEndpoint.test_train_unauthenticated_returns_401)
+SEC-AZ: Unauthenticated training request returns HTTP 401. ... ok
+test_train_with_preprocessing_succeeds (test_us18_model_training.TestTrainEndpoint.test_train_with_preprocessing_succeeds)
+FR-4.2-IT-1: Training with preprocessing options completes successfully. ... ok
+test_unsupported_algorithm_returns_400 (test_us18_model_training.TestTrainEndpoint.test_unsupported_algorithm_returns_400)
+FR-4.1-IT-2: An unsupported algorithm name is rejected with HTTP 400. ... ok
+test_authentication_and_cross_user_ownership (test_us20_model_comparison.TestUS20ModelComparison.test_authentication_and_cross_user_ownership) ... ok
+test_comparison_returns_actual_metrics_chart_and_rejects_incompatible_task (test_us20_model_comparison.TestUS20ModelComparison.test_comparison_returns_actual_metrics_chart_and_rejects_incompatible_task) ... ok
+test_missing_and_corrupted_artifacts_return_clear_errors (test_us20_model_comparison.TestUS20ModelComparison.test_missing_and_corrupted_artifacts_return_clear_errors) ... C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\tests\test_us20_model_comparison.py:175: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  model = MLModel.query.get(trained["model"]["id"])
+ok
+test_model_and_pdf_downloads_are_real_and_have_safe_headers (test_us20_model_comparison.TestUS20ModelComparison.test_model_and_pdf_downloads_are_real_and_have_safe_headers) ... C:\Users\gagan\anaconda3\Lib\unittest\case.py:606: ResourceWarning: unclosed file <_io.BufferedReader name='C:\\Users\\gagan\\Documents\\Codex\\2026-10-21\\hey\\work\\Web-Based-ML-model-evaluator-main\\backend\\tmp\\test-temp\\ml-evaluator-us20-k5x65syq\\models\\1\\9d391fcc1ace404a97b77d740c8d3d8b.joblib'>
+  if method() is not None:
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_regression_report_includes_preprocessing_and_metric_visualization (test_us20_model_comparison.TestUS20ModelComparison.test_regression_report_includes_preprocessing_and_metric_visualization) ... ok
+test_task_type_compatibility_and_frontend_handlers_are_wired (test_us20_model_comparison.TestUS20ModelComparison.test_task_type_compatibility_and_frontend_handlers_are_wired) ... C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\tests\test_us20_model_comparison.py:204: ResourceWarning: unclosed file <_io.TextIOWrapper name='C:\\Users\\gagan\\Documents\\Codex\\2026-10-21\\hey\\work\\Web-Based-ML-model-evaluator-main\\backend\\tests\\../../frontend/js/app.js' mode='r' encoding='utf-8'>
+  script = open(os.path.join(os.path.dirname(__file__), "../../frontend/js/app.js"), encoding="utf-8").read()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_train_persists_and_lists_real_evaluation_runs (test_us20_model_comparison.TestUS20ModelComparison.test_train_persists_and_lists_real_evaluation_runs) ... C:\Users\gagan\Documents\Codex\2026-10-21\hey\work\Web-Based-ML-model-evaluator-main\backend\tests\test_us20_model_comparison.py:86: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  model = MLModel.query.get(response.json["model"]["id"])
+ok
+
+----------------------------------------------------------------------
+Ran 215 tests in 63.881s
+
+OK
